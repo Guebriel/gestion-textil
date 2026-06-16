@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de inventario - pixelsublime</title>
+    <link rel="icon" href="pixelsublime.png" type="image/png" />
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🧵 Gestión de Inventario - pixelsublime</h1>
+        <p>Estadísticas y movimientos | Elimina telas que ya no uses</p>
+    </header>
+
+    <div class="main-options">
+        <div class="option-card" data-panel="estadisticas">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23eef2ff'/%3E%3Ctext x='20' y='50' font-size='40' fill='%231995AD'%3E📊%3C/text%3E%3C/svg%3E" alt="Estadísticas">
+            <h2>📈 Estadísticas</h2>
+            <p>Ver gastos individuales, gráfico y historial completo</p>
+        </div>
+        <div class="option-card" data-panel="movimientos">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23eef2ff'/%3E%3Ctext x='20' y='50' font-size='40' fill='%231995AD'%3E📋%3C/text%3E%3C/svg%3E" alt="Movimientos">
+            <h2>📦 Movimientos</h2>
+            <p>Registrar entradas/salidas y ver stock actual</p>
+        </div>
+    </div>
+
+    <div id="panel-estadisticas" class="panel">
+        <h2>📊 Estadísticas de consumo semanal</h2>
+        <div class="acciones">
+            <button id="btnReiniciarSemana" class="btn-danger">🔄 Reiniciar Semana</button>
+        </div>
+        <h3>📋 Lista de gastos de la semana (salidas)</h3>
+        <table class="tabla-gastos" id="tablaGastos">
+            <thead><tr><th>#</th><th>Tela</th><th>Cantidad (mts)</th><th>Hora</th><th>Fecha</th></tr></thead>
+            <tbody id="cuerpoTablaGastos"></tbody>
+        </table>
+        <div id="resumenBonito" class="resumen-container"></div>
+        <div class="grafico-container">
+            <canvas id="graficoGastos" width="800" height="400" style="max-height: 400px; width:100%"></canvas>
+        </div>
+        <h3>📜 Historial completo de movimientos (entradas + salidas)</h3>
+        <table class="tabla-historial" id="tablaHistorialCompleta">
+            <thead><tr><th>Tela</th><th>Tipo</th><th>Cantidad (mts)</th><th>Fecha</th><th>Hora</th></tr></thead>
+            <tbody id="cuerpoHistorialCompleto"></tbody>
+        </table>
+    </div>
+
+    <div id="panel-movimientos" class="panel">
+        <h2>📦 Registrar movimiento</h2>
+        <form id="movimientoForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Tela</label>
+                    <select id="telaSelect" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Operación</label>
+                    <select id="tipoMovimiento" required>
+                        <option value="entrada">📥 Entrada (+)</option>
+                        <option value="salida">📤 Salida (-)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Cantidad (metros)</label>
+                    <input type="number" id="cantidad" step="0.1" min="0.1" required placeholder="Ej: 15.5">
+                </div>
+                <div>
+                    <button type="submit" class="btn-primary" style="margin-top: 24px;">Aplicar</button>
+                </div>
+            </div>
+        </form>
+        <hr>
+        <h3>📌 Stock actual en almacén (tabla)</h3>
+        <table class="tabla-stock" id="tablaStock">
+            <thead>
+                <tr>
+                    <th>Materia Prima (Tela)</th>
+                    <th>Disponible (Metros)</th>
+                    <th>Última Salida</th>
+                    <th>Días sin uso</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="cuerpoTablaStock"></tbody>
+        </table>
+        <hr>
+        <div class="admin-panel">
+            <h3>⚙️ Administradora - Agregar nueva tela</h3>
+            <form id="nuevaTelaForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nombre nueva tela</label>
+                        <input type="text" id="nuevaTelaInput" required placeholder="Ej. Seda">
+                    </div>
+                    <div class="form-group">
+                        <label>Stock inicial (mts)</label>
+                        <input type="number" id="stockInicialInput" step="0.1" min="0" required placeholder="Ej. 50">
+                    </div>
+                    <div>
+                        <button type="submit" class="btn-accent">➕ Agregar</button>
+                    </div>
+                </div>
+            </form>
+            <hr>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                <button id="btnBorrarHistorial" class="btn-danger">🗑️ Borrar historial</button>
+                <button id="btnExportarHistorialPDF" class="btn-primary">📄 Exportar historial a PDF</button>
+                <button id="btnExportarReportePDF" class="btn-success">📊 Exportar reporte semanal a PDF</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
