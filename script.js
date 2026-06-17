@@ -4,6 +4,49 @@ let inventario = JSON.parse(localStorage.getItem('textil_inventario')) || stockI
 let historialMovimientos = JSON.parse(localStorage.getItem('textil_historial')) || [];
 let gastosSemanalesList = JSON.parse(localStorage.getItem('textil_gastos_list')) || [];
 
+// --- SISTEMA DE NOTIFICACIONES (TOAST) ---
+function mostrarNotificacion(tipo, mensaje) {
+    const container = document.getElementById('toast-container');
+    const iconos = {
+        success: '✅',
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️'
+    };
+    const clases = {
+        success: 'toast-success',
+        error: 'toast-error',
+        warning: 'toast-warning',
+        info: 'toast-info'
+    };
+    
+    const toast = document.createElement('div');
+    toast.className = `toast ${clases[tipo]}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${iconos[tipo]}</span>
+        <span class="toast-message">${mensaje}</span>
+        <button class="toast-close">✕</button>
+    `;
+    
+    container.appendChild(toast);
+    
+    const timeout = setTimeout(() => {
+        eliminarToast(toast);
+    }, 5000);
+    
+    toast.querySelector('.toast-close').addEventListener('click', () => {
+        clearTimeout(timeout);
+        eliminarToast(toast);
+    });
+}
+
+function eliminarToast(toast) {
+    toast.style.opacity = '0';
+    setTimeout(() => {
+        if (toast.parentNode) toast.remove();
+    }, 300);
+}
+
 // --- FUNCIÓN PARA ASEGURAR TIMESTAMP VÁLIDO ---
 function normalizarMovimientos(lista) {
     return lista.map(mov => {
@@ -78,7 +121,7 @@ function actualizarTablaStock() {
         tbody.innerHTML += `
             <tr class="${claseRot}">
                 <td><strong>${tela}</strong></td>
-                <td class="${stockBajo}">${cant.toFixed(2)} mts</td>
+                <td class="${stockBajo}">${cant.toFixed(2)} mts ${cant < 10 ? '<span class="badge-stock-bajo">⚠️ Stock bajo</span>' : ''}</td>
                 <td>${ultimaSalida}</td>
                 <td>${diasStr}</td>
                 <td><button class="btn-eliminar" data-tela="${tela}">🗑️ Eliminar</button></td>
@@ -96,7 +139,7 @@ function eliminarTela(tela) {
     delete inventario[tela];
     guardarTodo();
     actualizarUI();
-    alert(`Tela "${tela}" eliminada.`);
+    mostrarNotificacion('success', `Tela "${tela}" eliminada.`);
 }
 
 function actualizarSelect() {
@@ -111,7 +154,10 @@ function actualizarSelect() {
 function actualizarTablaGastos() {
     const tbody = document.getElementById('cuerpoTablaGastos');
     tbody.innerHTML = '';
-    if (gastosSemanalesList.length === 0) return;
+    if (gastosSemanalesList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#999;">No hay gastos registrados esta semana.</td></tr>';
+        return;
+    }
     gastosSemanalesList.forEach((g, idx) => {
         tbody.innerHTML += `
             <tr>
@@ -154,7 +200,7 @@ function actualizarHistorialCompleto() {
     tbody.innerHTML = '';
     const movs = [...historialMovimientos].reverse();
     if (movs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5">No hay movimientos registrados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">No hay movimientos registrados.</td></tr>';
         return;
     }
     movs.forEach(mov => {
@@ -169,63 +215,137 @@ function actualizarHistorialCompleto() {
     });
 }
 
+// --- GRÁFICO DE BARRAS (CORREGIDO Y CON VERIFICACIÓN) ---
 let chartInstance = null;
+
 function generarGrafico() {
-    const ctx = document.getElementById('graficoGastos').getContext('2d');
-    if (chartInstance) chartInstance.destroy();
+    const canvasElement = document.getElementById('graficoGastos');
+    if (!canvasElement) {
+        console.error('❌ No se encontró el canvas con id "graficoGastos"');
+        return;
+    }
+    
+    // Asegurar que el canvas tenga un tamaño visible
+    canvasElement.style.height = '350px';
+    canvasElement.style.width = '100%';
+    
+    const ctx = canvasElement.getContext('2d');
+    if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+    }
+    
+    // Si no hay datos, mostrar un gráfico vacío con mensaje
     if (gastosSemanalesList.length === 0) {
         chartInstance = new Chart(ctx, {
             type: 'bar',
-            data: { labels: ['Sin gastos'], datasets: [{ label: 'Metros', data: [0], backgroundColor: '#ccc' }] }
+            data: {
+                labels: ['Sin gastos'],
+                datasets: [{
+                    label: 'Metros consumidos',
+                    data: [0],
+                    backgroundColor: '#cccccc',
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, max: 1, title: { display: true, text: 'Metros' } },
+                    x: { title: { display: true, text: 'Hora del gasto' } }
+                }
+            }
         });
+        console.log('📊 Gráfico generado sin datos (mensaje vacío)');
         return;
     }
+    
+    // Preparar datos
     const horas = gastosSemanalesList.map(g => g.hora || '--:--');
     const datos = gastosSemanalesList.map(g => g.cantidad);
     const colores = gastosSemanalesList.map(g => getColorPorTela(g.tela));
+    
     chartInstance = new Chart(ctx, {
         type: 'bar',
-        data: { labels: horas, datasets: [{ label: 'Metros consumidos', data: datos, backgroundColor: colores, borderRadius: 8 }] },
+        data: {
+            labels: horas,
+            datasets: [{
+                label: 'Metros consumidos',
+                data: datos,
+                backgroundColor: colores,
+                borderRadius: 8,
+                barPercentage: 0.7
+            }]
+        },
         options: {
             responsive: true,
+            maintainAspectRatio: true,
             plugins: {
-                tooltip: { callbacks: { label: (ctx) => { const g = gastosSemanalesList[ctx.dataIndex]; return [`📅 Fecha: ${g.fecha}`, `⏰ Hora: ${g.hora}`, `🧵 Tela: ${g.tela}`, `📏 Cantidad: ${g.cantidad.toFixed(2)} mts`]; } } },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            const g = gastosSemanalesList[ctx.dataIndex];
+                            return [
+                                `📅 Fecha: ${g.fecha}`,
+                                `⏰ Hora: ${g.hora}`,
+                                `🧵 Tela: ${g.tela}`,
+                                `📏 Cantidad: ${g.cantidad.toFixed(2)} mts`
+                            ];
+                        }
+                    }
+                },
                 legend: { display: false }
             },
-            scales: { y: { beginAtZero: true, title: { display: true, text: 'Metros' } }, x: { title: { display: true, text: 'Hora del gasto' }, ticks: { autoSkip: true, maxRotation: 45 } } }
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Metros' },
+                    grid: { color: '#e9ecef' }
+                },
+                x: {
+                    title: { display: true, text: 'Hora del gasto' },
+                    ticks: { autoSkip: true, maxRotation: 45, minRotation: 30 }
+                }
+            }
         }
     });
+    console.log(`📊 Gráfico generado con ${gastosSemanalesList.length} gastos`);
 }
 
+// --- ACTUALIZAR UI ---
 function actualizarUI() {
     actualizarSelect();
     actualizarTablaStock();
     actualizarTablaGastos();
     actualizarResumenBonito();
     actualizarHistorialCompleto();
-    generarGrafico();
+    // Generar gráfico con un pequeño retraso para asegurar que el DOM esté listo
+    setTimeout(() => {
+        generarGrafico();
+    }, 100);
 }
 
-// --- GENERADOR DE PDF MULTIPÁGINA CORREGIDO ---
+// --- GENERADOR DE PDF MULTIPÁGINA ---
 async function generarPDFMultipagina(elemento, titulo, nombreArchivo) {
     if (!elemento) return;
     const originalDisplay = elemento.style.display;
     elemento.style.display = 'block';
 
-    // Clonar el elemento y quitar botones/interactividad
     const clone = elemento.cloneNode(true);
-    // Eliminar cualquier botón dentro del clon
     const botones = clone.querySelectorAll('button, .btn-eliminar, .btn-danger, .btn-primary');
     botones.forEach(btn => btn.remove());
     
-    // Establecer un ancho fijo razonable para que no se desborde
     clone.style.width = '700px';
     clone.style.margin = '0 auto';
     clone.style.backgroundColor = 'white';
     clone.style.padding = '20px';
     clone.style.fontFamily = 'Arial, sans-serif';
     
-    // Forzar que las tablas tengan bordes y padding legibles
     const tablas = clone.querySelectorAll('table');
     tablas.forEach(tabla => {
         tabla.style.width = '100%';
@@ -253,7 +373,6 @@ async function generarPDFMultipagina(elemento, titulo, nombreArchivo) {
         const margin = 10;
         const contentWidth = pageWidth - margin * 2;
         
-        // Capturar el contenido en canvas
         const canvas = await html2canvas(clone, { scale: 1.2, backgroundColor: '#ffffff', logging: false });
         const imgData = canvas.toDataURL('image/png');
         const imgHeight = (canvas.height * contentWidth) / canvas.width;
@@ -276,10 +395,10 @@ async function generarPDFMultipagina(elemento, titulo, nombreArchivo) {
             page++;
         }
         pdf.save(nombreArchivo);
-        alert(`PDF "${titulo}" generado correctamente.`);
+        mostrarNotificacion('success', `PDF "${titulo}" generado correctamente.`);
     } catch (error) {
         console.error(error);
-        alert("Error al generar el PDF: " + error.message);
+        mostrarNotificacion('error', `Error al generar PDF: ${error.message}`);
     } finally {
         document.body.removeChild(clone);
         elemento.style.display = originalDisplay;
@@ -292,7 +411,7 @@ document.getElementById('btnReiniciarSemana').addEventListener('click', () => {
         gastosSemanalesList = [];
         guardarTodo();
         actualizarUI();
-        alert("Semana reiniciada.");
+        mostrarNotificacion('success', 'Semana reiniciada.');
     }
 });
 
@@ -308,12 +427,14 @@ document.getElementById('movimientoForm').addEventListener('submit', (e) => {
     
     if (tipo === 'salida') {
         if (inventario[tela] < cantidad) {
-            alert(`Stock insuficiente de ${tela}. Disponible: ${inventario[tela]} mts`);
+            mostrarNotificacion('error', `Stock insuficiente de ${tela}. Disponible: ${inventario[tela]} mts`);
             return;
         }
         inventario[tela] -= cantidad;
         gastosSemanalesList.push({ id: Date.now(), tela, cantidad, fecha, hora, timestamp });
-        if (inventario[tela] < 10) alert(`⚠️ ALERTA: Stock bajo de ${tela}. Quedan ${inventario[tela].toFixed(2)} mts`);
+        if (inventario[tela] < 10) {
+            mostrarNotificacion('warning', `⚠️ ALERTA: Stock bajo de ${tela}. Quedan ${inventario[tela].toFixed(2)} mts`);
+        }
     } else {
         inventario[tela] += cantidad;
     }
@@ -321,13 +442,17 @@ document.getElementById('movimientoForm').addEventListener('submit', (e) => {
     guardarTodo();
     document.getElementById('cantidad').value = '';
     actualizarUI();
+    mostrarNotificacion('success', `Movimiento registrado: ${tipo === 'salida' ? 'Salida' : 'Entrada'} de ${cantidad} mts.`);
 });
 
 document.getElementById('nuevaTelaForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const nueva = document.getElementById('nuevaTelaInput').value.trim();
     const stockIni = parseFloat(document.getElementById('stockInicialInput').value);
-    if (inventario[nueva]) { alert("Ya existe"); return; }
+    if (inventario[nueva]) {
+        mostrarNotificacion('error', 'Esta tela ya existe.');
+        return;
+    }
     inventario[nueva] = stockIni;
     const ahora = new Date();
     const fecha = ahora.toLocaleDateString();
@@ -337,7 +462,7 @@ document.getElementById('nuevaTelaForm').addEventListener('submit', (e) => {
     actualizarUI();
     document.getElementById('nuevaTelaInput').value = '';
     document.getElementById('stockInicialInput').value = '';
-    alert(`Tela "${nueva}" agregada con ${stockIni} mts. Movimiento registrado.`);
+    mostrarNotificacion('success', `Tela "${nueva}" agregada con ${stockIni} mts. Movimiento registrado.`);
 });
 
 document.getElementById('btnBorrarHistorial').addEventListener('click', () => {
@@ -345,15 +470,15 @@ document.getElementById('btnBorrarHistorial').addEventListener('click', () => {
         historialMovimientos = [];
         guardarTodo();
         actualizarUI();
-        alert("Historial borrado.");
+        mostrarNotificacion('info', 'Historial borrado.');
     }
 });
 
-// --- EXPORTAR HISTORIAL PDF (limpio) ---
+// --- EXPORTAR HISTORIAL PDF ---
 document.getElementById('btnExportarHistorialPDF').addEventListener('click', async () => {
     const tabla = document.getElementById('tablaHistorialCompleta');
     if (!tabla || tabla.querySelectorAll('tbody tr').length === 0 || tabla.querySelector('td[colspan]')) {
-        alert("No hay datos en el historial para exportar.");
+        mostrarNotificacion('error', 'No hay datos en el historial para exportar.');
         return;
     }
     const contenedor = document.createElement('div');
@@ -371,13 +496,13 @@ document.getElementById('btnExportarHistorialPDF').addEventListener('click', asy
     await generarPDFMultipagina(contenedor, 'Historial', `historial_${Date.now()}.pdf`);
 });
 
-// --- EXPORTAR REPORTE SEMANAL PDF (limpio) ---
+// --- EXPORTAR REPORTE SEMANAL PDF ---
 document.getElementById('btnExportarReportePDF').addEventListener('click', async () => {
     const resumenDiv = document.getElementById('resumenBonito');
     const tablaGastos = document.getElementById('tablaGastos');
     const graficoCanvas = document.getElementById('graficoGastos');
     if (!tablaGastos || tablaGastos.querySelectorAll('tbody tr').length === 0) {
-        alert("No hay gastos esta semana para generar el reporte.");
+        mostrarNotificacion('error', 'No hay gastos esta semana para generar el reporte.');
         return;
     }
     const contenedor = document.createElement('div');
@@ -401,7 +526,93 @@ document.getElementById('btnExportarReportePDF').addEventListener('click', async
     await generarPDFMultipagina(contenedor, 'Reporte Semanal', `reporte_semanal_${Date.now()}.pdf`);
 });
 
-// Navegación entre paneles
+// --- EXPORTAR STOCK A EXCEL ---
+document.getElementById('btnExportarStockExcel').addEventListener('click', () => {
+    const data = [];
+    data.push(['Tela', 'Disponible (mts)', 'Última Salida', 'Días sin uso']);
+    for (const [tela, cant] of Object.entries(inventario)) {
+        const rot = calcularRotacion(tela);
+        let ultimaSalida = 'Nunca';
+        let dias = 'Sin salidas';
+        if (rot.hasSales) {
+            ultimaSalida = rot.lastSaleDate.toLocaleDateString();
+            dias = `${rot.daysSince} día${rot.daysSince !== 1 ? 's' : ''}`;
+        }
+        data.push([tela, cant.toFixed(2), ultimaSalida, dias]);
+    }
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Stock');
+    XLSX.writeFile(wb, `stock_${new Date().toISOString().slice(0,10)}.xlsx`);
+    mostrarNotificacion('success', 'Stock exportado a Excel correctamente.');
+});
+
+// --- EXPORTAR HISTORIAL A EXCEL ---
+document.getElementById('btnExportarHistorialExcel').addEventListener('click', () => {
+    if (historialMovimientos.length === 0) {
+        mostrarNotificacion('error', 'No hay movimientos para exportar.');
+        return;
+    }
+    const data = [];
+    data.push(['Tela', 'Tipo', 'Cantidad (mts)', 'Fecha', 'Hora']);
+    const movs = [...historialMovimientos].reverse();
+    movs.forEach(mov => {
+        data.push([
+            mov.tela,
+            mov.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA',
+            mov.cantidad.toFixed(2),
+            mov.fecha,
+            mov.hora || '--:--:--'
+        ]);
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+    XLSX.writeFile(wb, `historial_${new Date().toISOString().slice(0,10)}.xlsx`);
+    mostrarNotificacion('success', 'Historial exportado a Excel correctamente.');
+});
+
+// --- EXPORTAR REPORTE SEMANAL A EXCEL ---
+document.getElementById('btnExportarReporteExcel').addEventListener('click', () => {
+    if (gastosSemanalesList.length === 0) {
+        mostrarNotificacion('error', 'No hay gastos esta semana para exportar.');
+        return;
+    }
+    const data = [];
+    data.push(['#', 'Tela', 'Cantidad (mts)', 'Hora', 'Fecha']);
+    gastosSemanalesList.forEach((g, idx) => {
+        data.push([
+            idx+1,
+            g.tela,
+            g.cantidad.toFixed(2),
+            g.hora || '--:--:--',
+            g.fecha || ''
+        ]);
+    });
+    const total = gastosSemanalesList.reduce((sum, g) => sum + g.cantidad, 0);
+    data.push([]);
+    data.push(['TOTAL GASTADO', '', total.toFixed(2), '', '']);
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Reporte Semanal');
+    XLSX.writeFile(wb, `reporte_semanal_${new Date().toISOString().slice(0,10)}.xlsx`);
+    mostrarNotificacion('success', 'Reporte semanal exportado a Excel correctamente.');
+});
+
+// --- MENÚ ACORDEÓN ---
+document.querySelectorAll('.menu-titulo').forEach(titulo => {
+    titulo.addEventListener('click', function() {
+        const categoria = this.dataset.categoria;
+        const submenu = document.getElementById(`submenu-${categoria}`);
+        const flecha = this.querySelector('.menu-flecha');
+        if (submenu) {
+            submenu.classList.toggle('mostrar');
+            if (flecha) flecha.classList.toggle('abierto');
+        }
+    });
+});
+
+// --- NAVEGACIÓN ENTRE PANELES (CON ACTUALIZACIÓN DE GRÁFICO) ---
 const panels = document.querySelectorAll('.panel');
 const optionCards = document.querySelectorAll('.option-card');
 optionCards.forEach(card => {
@@ -411,9 +622,14 @@ optionCards.forEach(card => {
         document.getElementById(`panel-${target}`).classList.add('active');
         optionCards.forEach(c => c.classList.remove('active'));
         card.classList.add('active');
+        // Si se activa el panel de estadísticas, forzar la actualización del gráfico
+        if (target === 'estadisticas') {
+            setTimeout(() => generarGrafico(), 200);
+        }
     });
 });
 document.querySelector('.option-card[data-panel="movimientos"]').classList.add('active');
 document.getElementById('panel-movimientos').classList.add('active');
 
+// Inicializar la interfaz (incluye el gráfico)
 actualizarUI();

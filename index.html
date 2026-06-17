@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -77,45 +78,84 @@
         </form>
         <hr>
         <h3>📌 Stock actual en almacén (tabla)</h3>
-        <table class="tabla-stock" id="tablaStock">
-            <thead>
-                <tr>
-                    <th>Materia Prima (Tela)</th>
-                    <th>Disponible (Metros)</th>
-                    <th>Última Salida</th>
-                    <th>Días sin uso</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="cuerpoTablaStock"></tbody>
-        </table>
+        <div class="tabla-wrapper">
+            <table class="tabla-stock" id="tablaStock">
+                <thead>
+                    <tr>
+                        <th>Materia Prima (Tela)</th>
+                        <th>Disponible (Metros)</th>
+                        <th>Última Salida</th>
+                        <th>Días sin uso</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="cuerpoTablaStock"></tbody>
+            </table>
+        </div>
         <hr>
         <div class="admin-panel">
-            <h3>⚙️ Administradora - Agregar nueva tela</h3>
-            <form id="nuevaTelaForm">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Nombre nueva tela</label>
-                        <input type="text" id="nuevaTelaInput" required placeholder="Ej. Seda">
+            <h3>⚙️ Administradora</h3>
+
+            <div class="acciones-card">
+                <h4>➕ Agregar nueva tela</h4>
+                <form id="nuevaTelaForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nombre nueva tela</label>
+                            <input type="text" id="nuevaTelaInput" required placeholder="Ej. Seda">
+                        </div>
+                        <div class="form-group">
+                            <label>Stock inicial (mts)</label>
+                            <input type="number" id="stockInicialInput" step="0.1" min="0" required placeholder="Ej. 50">
+                        </div>
+                        <div>
+                            <button type="submit" class="btn-accent">➕ Agregar</button>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Stock inicial (mts)</label>
-                        <input type="number" id="stockInicialInput" step="0.1" min="0" required placeholder="Ej. 50">
+                </form>
+            </div>
+
+            <div class="acciones-card">
+                <h4>📋 Acciones rápidas</h4>
+                <div class="menu-lateral">
+                    <div class="menu-categoria">
+                        <div class="menu-titulo" data-categoria="pdf">
+                            <span>📄</span> Exportar a PDF
+                            <span class="menu-flecha">▶</span>
+                        </div>
+                        <div class="menu-opciones" id="submenu-pdf">
+                            <button id="btnExportarHistorialPDF" class="btn-primary">📄 Historial</button>
+                            <button id="btnExportarReportePDF" class="btn-success">📊 Reporte semanal</button>
+                        </div>
                     </div>
-                    <div>
-                        <button type="submit" class="btn-accent">➕ Agregar</button>
+
+                    <div class="menu-categoria">
+                        <div class="menu-titulo" data-categoria="excel">
+                            <span>📊</span> Exportar a Excel
+                            <span class="menu-flecha">▶</span>
+                        </div>
+                        <div class="menu-opciones" id="submenu-excel">
+                            <button id="btnExportarStockExcel" class="btn-accent">📊 Stock</button>
+                            <button id="btnExportarHistorialExcel" class="btn-primary">📄 Historial</button>
+                            <button id="btnExportarReporteExcel" class="btn-success">📈 Reporte semanal</button>
+                        </div>
+                    </div>
+
+                    <div class="menu-categoria">
+                        <div class="menu-titulo" data-categoria="editar">
+                            <span>🗑️</span> Editar
+                            <span class="menu-flecha">▶</span>
+                        </div>
+                        <div class="menu-opciones" id="submenu-editar">
+                            <button id="btnBorrarHistorial" class="btn-danger">🗑️ Borrar historial</button>
+                        </div>
                     </div>
                 </div>
-            </form>
-            <hr>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
-                <button id="btnBorrarHistorial" class="btn-danger">🗑️ Borrar historial</button>
-                <button id="btnExportarHistorialPDF" class="btn-primary">📄 Exportar historial a PDF</button>
-                <button id="btnExportarReportePDF" class="btn-success">📊 Exportar reporte semanal a PDF</button>
             </div>
         </div>
     </div>
 </div>
+<div id="toast-container"></div>
 <script src="script.js"></script>
 </body>
 </html>
