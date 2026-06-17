@@ -36,6 +36,15 @@
         <div class="acciones">
             <button id="btnReiniciarSemana" class="btn-danger">🔄 Reiniciar Semana</button>
         </div>
+
+        <div class="filtros-grafico">
+            <button class="btn-filtro active" data-vista="hora">🕐 Por hora (día)</button>
+            <button class="btn-filtro" data-vista="dia-semana">📅 Por día (semana)</button>
+            <button class="btn-filtro" data-vista="semana-mes">📆 Por semana (mes)</button>
+            <button class="btn-filtro" data-vista="dia-mes">📊 Por día (mes)</button>
+            <button class="btn-filtro" data-vista="top3">🏆 Top 3 gastos</button>
+        </div>
+
         <h3>📋 Lista de gastos de la semana (salidas)</h3>
         <table class="tabla-gastos" id="tablaGastos">
             <thead><tr><th>#</th><th>Tela</th><th>Cantidad (mts)</th><th>Hora</th><th>Fecha</th></tr></thead>
@@ -78,6 +87,9 @@
         </form>
         <hr>
         <h3>📌 Stock actual en almacén (tabla)</h3>
+        <div class="buscador-stock">
+            <input type="text" id="buscadorTela" placeholder="🔍 Buscar tela..." />
+        </div>
         <div class="tabla-wrapper">
             <table class="tabla-stock" id="tablaStock">
                 <thead>
@@ -148,6 +160,7 @@
                         </div>
                         <div class="menu-opciones" id="submenu-editar">
                             <button id="btnBorrarHistorial" class="btn-danger">🗑️ Borrar historial</button>
+                            <button id="btnEditarNombreTela" class="btn-primary">✏️ Editar nombre</button>
                         </div>
                     </div>
                 </div>

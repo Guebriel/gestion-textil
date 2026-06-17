@@ -40,7 +40,6 @@ header p {
     color: var(--text-dark);
 }
 
-/* ===== OPCIONES PRINCIPALES ===== */
 .main-options {
     display: flex;
     justify-content: center;
@@ -93,7 +92,37 @@ header p {
     font-size: 0.85rem;
 }
 
-/* ===== PANELES ===== */
+.filtros-grafico {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 10px 0 15px 0;
+}
+
+.filtros-grafico .btn-filtro {
+    background: var(--overcast);
+    color: var(--text-dark);
+    border: 1px solid var(--warm-gray);
+    padding: 6px 14px;
+    border-radius: 40px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filtros-grafico .btn-filtro:hover {
+    background: var(--ice);
+    transform: translateY(-2px);
+}
+
+.filtros-grafico .btn-filtro.active {
+    background: var(--glacier);
+    color: white;
+    border-color: var(--glacier);
+    box-shadow: 0 2px 8px rgba(25, 149, 173, 0.3);
+}
+
 .panel {
     display: none;
     background: var(--card-white);
@@ -118,7 +147,6 @@ header p {
     margin: 15px 0 10px;
 }
 
-/* ===== TABLAS CON SCROLL EN MÓVIL ===== */
 .tabla-wrapper {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -147,7 +175,27 @@ header p {
     font-weight: 600;
 }
 
-/* ===== BOTONES ===== */
+.buscador-stock {
+    margin: 10px 0 15px 0;
+}
+
+.buscador-stock input {
+    width: 100%;
+    max-width: 400px;
+    padding: 8px 14px;
+    border-radius: 40px;
+    border: 1px solid var(--warm-gray);
+    background: var(--overcast);
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.buscador-stock input:focus {
+    outline: none;
+    border-color: var(--glacier);
+    box-shadow: 0 0 0 2px rgba(25, 149, 173, 0.2);
+}
+
 button {
     border: none;
     padding: 6px 14px;
@@ -210,7 +258,6 @@ button {
     transform: scale(1.02);
 }
 
-/* ===== RESÚMENES ===== */
 .resumen-container {
     display: flex;
     flex-wrap: wrap;
@@ -253,7 +300,6 @@ button {
     color: white;
 }
 
-/* ===== GRÁFICO ===== */
 .grafico-container {
     margin: 15px 0;
 }
@@ -266,7 +312,6 @@ canvas {
     padding: 10px;
 }
 
-/* ===== LEYENDA ===== */
 .legend {
     display: flex;
     flex-wrap: wrap;
@@ -292,7 +337,6 @@ canvas {
     border-radius: 4px;
 }
 
-/* ===== FORMULARIOS ===== */
 .form-row {
     display: flex;
     gap: 12px;
@@ -329,7 +373,6 @@ select:focus, input:focus {
     box-shadow: 0 0 0 2px rgba(25, 149, 173, 0.2);
 }
 
-/* ===== ADMINISTRADORA ===== */
 .admin-panel {
     background: #f8f9ff;
     padding: 15px;
@@ -360,7 +403,6 @@ select:focus, input:focus {
     padding-bottom: 6px;
 }
 
-/* ===== MENÚ ACORDEÓN ===== */
 .admin-panel .menu-lateral {
     margin-top: 0;
 }
@@ -419,7 +461,6 @@ select:focus, input:focus {
     margin: 0;
 }
 
-/* ===== BADGES ===== */
 .badge-salida, .badge-entrada {
     display: inline-block;
     padding: 2px 8px;
@@ -437,7 +478,6 @@ select:focus, input:focus {
     color: #0b5e42;
 }
 
-/* ===== ROTACIÓN ===== */
 .rotacion-verde {
     background-color: #d4edda;
     color: #155724;
@@ -480,7 +520,6 @@ select:focus, input:focus {
     margin-left: 4px;
 }
 
-/* ===== TOAST ===== */
 #toast-container {
     position: fixed;
     top: 15px;
@@ -563,7 +602,6 @@ select:focus, input:focus {
     opacity: 1;
 }
 
-/* ===== RESPONSIVE: TABLETS Y MÓVILES ===== */
 @media (max-width: 768px) {
     body {
         padding: 10px;
@@ -599,6 +637,15 @@ select:focus, input:focus {
     .panel {
         padding: 14px;
         border-radius: 18px;
+    }
+
+    .filtros-grafico {
+        gap: 5px;
+    }
+
+    .filtros-grafico .btn-filtro {
+        font-size: 0.7rem;
+        padding: 4px 10px;
     }
 
     .resumen-card {
@@ -659,7 +706,7 @@ select:focus, input:focus {
 
     .option-card p {
         font-size: 0.6rem;
-        display: none; /* Ocultar descripción en móviles muy pequeños */
+        display: none;
     }
 
     .panel {
@@ -673,6 +720,15 @@ select:focus, input:focus {
 
     .panel h3 {
         font-size: 0.95rem;
+    }
+
+    .filtros-grafico {
+        gap: 4px;
+    }
+
+    .filtros-grafico .btn-filtro {
+        font-size: 0.6rem;
+        padding: 3px 8px;
     }
 
     .tabla-stock, .tabla-gastos, .tabla-historial {
@@ -749,6 +805,12 @@ select:focus, input:focus {
     .admin-panel .menu-opciones button {
         font-size: 0.65rem;
         padding: 3px 8px;
+    }
+
+    .buscador-stock input {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+        max-width: 100%;
     }
 
     #toast-container {

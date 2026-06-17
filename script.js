@@ -215,63 +215,30 @@ function actualizarHistorialCompleto() {
     });
 }
 
-// --- GRÁFICO DE BARRAS (CORREGIDO Y CON VERIFICACIÓN) ---
-let chartInstance = null;
+// ====== FUNCIONES PARA PREPARAR DATOS DEL GRÁFICO ======
 
-function generarGrafico() {
-    const canvasElement = document.getElementById('graficoGastos');
-    if (!canvasElement) {
-        console.error('❌ No se encontró el canvas con id "graficoGastos"');
-        return;
-    }
-    
-    // Asegurar que el canvas tenga un tamaño visible
-    canvasElement.style.height = '350px';
-    canvasElement.style.width = '100%';
-    
-    const ctx = canvasElement.getContext('2d');
-    if (chartInstance) {
-        chartInstance.destroy();
-        chartInstance = null;
-    }
-    
-    // Si no hay datos, mostrar un gráfico vacío con mensaje
+function prepararDatosHora() {
     if (gastosSemanalesList.length === 0) {
-        chartInstance = new Chart(ctx, {
-            type: 'bar',
+        return {
+            tipo: 'bar',
             data: {
                 labels: ['Sin gastos'],
-                datasets: [{
-                    label: 'Metros consumidos',
-                    data: [0],
-                    backgroundColor: '#cccccc',
-                    borderRadius: 6
-                }]
+                datasets: [{ label: 'Metros', data: [0], backgroundColor: '#ccc' }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: { enabled: false }
-                },
-                scales: {
-                    y: { beginAtZero: true, max: 1, title: { display: true, text: 'Metros' } },
-                    x: { title: { display: true, text: 'Hora del gasto' } }
-                }
+                plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                scales: { y: { beginAtZero: true, max: 1, title: { display: true, text: 'Metros' } } }
             }
-        });
-        console.log('📊 Gráfico generado sin datos (mensaje vacío)');
-        return;
+        };
     }
-    
-    // Preparar datos
+
     const horas = gastosSemanalesList.map(g => g.hora || '--:--');
     const datos = gastosSemanalesList.map(g => g.cantidad);
     const colores = gastosSemanalesList.map(g => getColorPorTela(g.tela));
-    
-    chartInstance = new Chart(ctx, {
-        type: 'bar',
+
+    return {
+        tipo: 'bar',
         data: {
             labels: horas,
             datasets: [{
@@ -302,35 +269,471 @@ function generarGrafico() {
                 legend: { display: false }
             },
             scales: {
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Metros' },
-                    grid: { color: '#e9ecef' }
-                },
-                x: {
-                    title: { display: true, text: 'Hora del gasto' },
-                    ticks: { autoSkip: true, maxRotation: 45, minRotation: 30 }
-                }
+                y: { beginAtZero: true, title: { display: true, text: 'Metros' }, grid: { color: '#e9ecef' } },
+                x: { title: { display: true, text: 'Hora del gasto' }, ticks: { autoSkip: true, maxRotation: 45, minRotation: 30 } }
             }
         }
-    });
-    console.log(`📊 Gráfico generado con ${gastosSemanalesList.length} gastos`);
+    };
 }
 
-// --- ACTUALIZAR UI ---
+function prepararDatosDiaSemana() {
+    const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    const acumulado = {};
+    
+    gastosSemanalesList.forEach(g => {
+        if (g.fecha) {
+            const fecha = new Date(g.fecha.split('/').reverse().join('-'));
+            const dia = fecha.getDay();
+            const diaNombre = diasSemana[(dia + 6) % 7];
+            if (!acumulado[diaNombre]) acumulado[diaNombre] = {};
+            acumulado[diaNombre][g.tela] = (acumulado[diaNombre][g.tela] || 0) + g.cantidad;
+        }
+    });
+
+    const telas = new Set();
+    Object.values(acumulado).forEach(diaData => {
+        Object.keys(diaData).forEach(tela => telas.add(tela));
+    });
+    const listaTelas = Array.from(telas);
+
+    if (listaTelas.length === 0) {
+        return {
+            tipo: 'bar',
+            data: {
+                labels: diasSemana,
+                datasets: [{ label: 'Metros', data: [0,0,0,0,0,0,0], backgroundColor: '#ccc' }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                scales: { y: { beginAtZero: true, title: { display: true, text: 'Metros' } } }
+            }
+        };
+    }
+
+    const datasets = listaTelas.map(tela => {
+        const data = diasSemana.map(dia => acumulado[dia]?.[tela] || 0);
+        return {
+            label: tela,
+            data: data,
+            backgroundColor: getColorPorTela(tela),
+            borderRadius: 4,
+            barPercentage: 0.6
+        };
+    });
+
+    return {
+        tipo: 'bar',
+        data: {
+            labels: diasSemana,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const label = context.dataset.label || '';
+                            const value = context.raw || 0;
+                            return `${label}: ${value.toFixed(2)} mts`;
+                        },
+                        footer: (items) => {
+                            const diaIndex = items[0].dataIndex;
+                            let total = 0;
+                            items.forEach(item => { total += item.raw || 0; });
+                            return `Total: ${total.toFixed(2)} mts`;
+                        }
+                    }
+                },
+                legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+            },
+            scales: {
+                x: { stacked: true, title: { display: true, text: 'Día de la semana' }, grid: { display: false } },
+                y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Metros' }, grid: { color: '#e9ecef' } }
+            }
+        }
+    };
+}
+
+function prepararDatosSemanaMes() {
+    const acumulado = {};
+    
+    gastosSemanalesList.forEach(g => {
+        if (g.fecha) {
+            const fecha = new Date(g.fecha.split('/').reverse().join('-'));
+            const semana = Math.ceil((fecha.getDate() - fecha.getDay() + 1) / 7);
+            const mes = fecha.getMonth() + 1;
+            const key = `Sem ${semana} (${mes})`;
+            if (!acumulado[key]) acumulado[key] = {};
+            acumulado[key][g.tela] = (acumulado[key][g.tela] || 0) + g.cantidad;
+        }
+    });
+
+    const semanas = Object.keys(acumulado).sort((a, b) => {
+        const numA = parseInt(a.split(' ')[1]);
+        const numB = parseInt(b.split(' ')[1]);
+        return numA - numB;
+    });
+
+    const telas = new Set();
+    Object.values(acumulado).forEach(semanaData => {
+        Object.keys(semanaData).forEach(tela => telas.add(tela));
+    });
+    const listaTelas = Array.from(telas);
+
+    if (listaTelas.length === 0 || semanas.length === 0) {
+        return {
+            tipo: 'bar',
+            data: {
+                labels: ['Sin datos'],
+                datasets: [{ label: 'Metros', data: [0], backgroundColor: '#ccc' }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false }, tooltip: { enabled: false } }
+            }
+        };
+    }
+
+    const datasets = listaTelas.map(tela => {
+        const data = semanas.map(semana => acumulado[semana]?.[tela] || 0);
+        return {
+            label: tela,
+            data: data,
+            backgroundColor: getColorPorTela(tela),
+            borderRadius: 4,
+            barPercentage: 0.6
+        };
+    });
+
+    return {
+        tipo: 'bar',
+        data: {
+            labels: semanas,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const label = context.dataset.label || '';
+                            const value = context.raw || 0;
+                            return `${label}: ${value.toFixed(2)} mts`;
+                        },
+                        footer: (items) => {
+                            const semanaIndex = items[0].dataIndex;
+                            let total = 0;
+                            items.forEach(item => { total += item.raw || 0; });
+                            return `Total: ${total.toFixed(2)} mts`;
+                        }
+                    }
+                },
+                legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+            },
+            scales: {
+                x: { stacked: true, title: { display: true, text: 'Semana del mes' }, grid: { display: false } },
+                y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Metros' }, grid: { color: '#e9ecef' } }
+            }
+        }
+    };
+}
+
+function prepararDatosDiaMes() {
+    const acumulado = {};
+    
+    gastosSemanalesList.forEach(g => {
+        if (g.fecha) {
+            const fecha = new Date(g.fecha.split('/').reverse().join('-'));
+            const dia = fecha.getDate();
+            const key = `Día ${dia}`;
+            if (!acumulado[key]) acumulado[key] = {};
+            acumulado[key][g.tela] = (acumulado[key][g.tela] || 0) + g.cantidad;
+        }
+    });
+
+    const dias = Object.keys(acumulado).sort((a, b) => {
+        const numA = parseInt(a.split(' ')[1]);
+        const numB = parseInt(b.split(' ')[1]);
+        return numA - numB;
+    });
+
+    const telas = new Set();
+    Object.values(acumulado).forEach(diaData => {
+        Object.keys(diaData).forEach(tela => telas.add(tela));
+    });
+    const listaTelas = Array.from(telas);
+
+    if (listaTelas.length === 0 || dias.length === 0) {
+        return {
+            tipo: 'bar',
+            data: {
+                labels: ['Sin datos'],
+                datasets: [{ label: 'Metros', data: [0], backgroundColor: '#ccc' }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false }, tooltip: { enabled: false } }
+            }
+        };
+    }
+
+    const datasets = listaTelas.map(tela => {
+        const data = dias.map(dia => acumulado[dia]?.[tela] || 0);
+        return {
+            label: tela,
+            data: data,
+            backgroundColor: getColorPorTela(tela),
+            borderRadius: 4,
+            barPercentage: 0.6
+        };
+    });
+
+    return {
+        tipo: 'bar',
+        data: {
+            labels: dias,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const label = context.dataset.label || '';
+                            const value = context.raw || 0;
+                            return `${label}: ${value.toFixed(2)} mts`;
+                        },
+                        footer: (items) => {
+                            const diaIndex = items[0].dataIndex;
+                            let total = 0;
+                            items.forEach(item => { total += item.raw || 0; });
+                            return `Total: ${total.toFixed(2)} mts`;
+                        }
+                    }
+                },
+                legend: { display: true, position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+            },
+            scales: {
+                x: { stacked: true, title: { display: true, text: 'Día del mes' }, grid: { display: false } },
+                y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Metros' }, grid: { color: '#e9ecef' } }
+            }
+        }
+    };
+}
+
+function prepararDatosTop3() {
+    const acumulado = {};
+    gastosSemanalesList.forEach(g => {
+        acumulado[g.tela] = (acumulado[g.tela] || 0) + g.cantidad;
+    });
+
+    const ordenado = Object.entries(acumulado).sort((a, b) => b[1] - a[1]);
+    const top3 = ordenado.slice(0, 3);
+
+    if (top3.length === 0) {
+        return {
+            tipo: 'bar',
+            data: {
+                labels: ['Sin datos'],
+                datasets: [{ label: 'Metros', data: [0], backgroundColor: '#ccc' }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false }, tooltip: { enabled: false } }
+            }
+        };
+    }
+
+    const labels = top3.map(item => item[0]);
+    const datos = top3.map(item => item[1]);
+    const colores = top3.map(item => getColorPorTela(item[0]));
+
+    return {
+        tipo: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Metros consumidos',
+                data: datos,
+                backgroundColor: colores,
+                borderRadius: 8,
+                barPercentage: 0.5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (ctx) => {
+                            return `${ctx.raw.toFixed(2)} mts`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { beginAtZero: true, title: { display: true, text: 'Metros consumidos' }, grid: { color: '#e9ecef' } },
+                x: { title: { display: true, text: 'Tela' }, grid: { display: false } }
+            }
+        }
+    };
+}
+
+// ====== GENERADOR DE GRÁFICO CON CAMBIO DE VISTA ======
+
+let chartInstance = null;
+let vistaActual = 'hora';
+
+function generarGrafico() {
+    const canvasElement = document.getElementById('graficoGastos');
+    if (!canvasElement) {
+        console.error('❌ No se encontró el canvas');
+        return;
+    }
+
+    canvasElement.style.height = '350px';
+    canvasElement.style.width = '100%';
+    const ctx = canvasElement.getContext('2d');
+
+    if (chartInstance) {
+        chartInstance.destroy();
+        chartInstance = null;
+    }
+
+    let data = null;
+
+    switch (vistaActual) {
+        case 'hora':
+            data = prepararDatosHora();
+            break;
+        case 'dia-semana':
+            data = prepararDatosDiaSemana();
+            break;
+        case 'semana-mes':
+            data = prepararDatosSemanaMes();
+            break;
+        case 'dia-mes':
+            data = prepararDatosDiaMes();
+            break;
+        case 'top3':
+            data = prepararDatosTop3();
+            break;
+        default:
+            data = prepararDatosHora();
+    }
+
+    if (vistaActual === 'top3' && data.data.labels.length > 0 && data.data.labels[0] !== 'Sin datos') {
+        data.options = data.options || {};
+        data.options.plugins = data.options.plugins || {};
+        data.options.plugins.afterDraw = (chart) => {
+            const { ctx, data, chartArea: { top, bottom, left, right } } = chart;
+            const meta = chart.getDatasetMeta(0);
+            meta.data.forEach((bar, index) => {
+                const value = data.datasets[0].data[index];
+                const x = bar.x;
+                const y = bar.y - 8;
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${value.toFixed(0)} mts`, x, y);
+            });
+        };
+    }
+
+    chartInstance = new Chart(ctx, {
+        type: data.tipo || 'bar',
+        data: data.data,
+        options: data.options
+    });
+
+    console.log(`📊 Gráfico generado con vista: ${vistaActual}`);
+}
+
+// ====== ACTUALIZAR UI ======
+
 function actualizarUI() {
     actualizarSelect();
     actualizarTablaStock();
     actualizarTablaGastos();
     actualizarResumenBonito();
     actualizarHistorialCompleto();
-    // Generar gráfico con un pequeño retraso para asegurar que el DOM esté listo
     setTimeout(() => {
         generarGrafico();
     }, 100);
 }
 
-// --- GENERADOR DE PDF MULTIPÁGINA ---
+// ====== BÚSQUEDA DE TELAS ======
+
+document.getElementById('buscadorTela').addEventListener('input', function() {
+    const termino = this.value.toLowerCase().trim();
+    const filas = document.querySelectorAll('#cuerpoTablaStock tr');
+    
+    filas.forEach(fila => {
+        const nombreTela = fila.querySelector('td:first-child')?.textContent?.toLowerCase() || '';
+        if (nombreTela.includes(termino)) {
+            fila.style.display = '';
+        } else {
+            fila.style.display = 'none';
+        }
+    });
+});
+
+// ====== EDITAR NOMBRE DE TELA ======
+
+document.getElementById('btnEditarNombreTela').addEventListener('click', function() {
+    const telas = Object.keys(inventario);
+    if (telas.length === 0) {
+        mostrarNotificacion('error', 'No hay telas para editar.');
+        return;
+    }
+    
+    const telaAntigua = prompt('¿Qué tela quieres renombrar? (escribe el nombre exacto)');
+    if (!telaAntigua) return;
+    
+    if (!inventario[telaAntigua]) {
+        mostrarNotificacion('error', `La tela "${telaAntigua}" no existe.`);
+        return;
+    }
+    
+    const nuevoNombreTela = prompt(`Nuevo nombre para "${telaAntigua}":`);
+    if (!nuevoNombreTela || nuevoNombreTela.trim() === '') {
+        mostrarNotificacion('error', 'El nombre no puede estar vacío.');
+        return;
+    }
+    
+    if (inventario[nuevoNombreTela] && nuevoNombreTela !== telaAntigua) {
+        mostrarNotificacion('error', `Ya existe una tela con el nombre "${nuevoNombreTela}".`);
+        return;
+    }
+    
+    const cantidad = inventario[telaAntigua];
+    delete inventario[telaAntigua];
+    inventario[nuevoNombreTela] = cantidad;
+    
+    historialMovimientos.forEach(mov => {
+        if (mov.tela === telaAntigua) mov.tela = nuevoNombreTela;
+    });
+    
+    gastosSemanalesList.forEach(g => {
+        if (g.tela === telaAntigua) g.tela = nuevoNombreTela;
+    });
+    
+    guardarTodo();
+    actualizarUI();
+    mostrarNotificacion('success', `Tela "${telaAntigua}" renombrada a "${nuevoNombreTela}".`);
+});
+
+// ====== GENERADOR DE PDF MULTIPÁGINA ======
+
 async function generarPDFMultipagina(elemento, titulo, nombreArchivo) {
     if (!elemento) return;
     const originalDisplay = elemento.style.display;
@@ -405,7 +808,17 @@ async function generarPDFMultipagina(elemento, titulo, nombreArchivo) {
     }
 }
 
-// --- EVENTOS ---
+// ====== EVENTOS ======
+
+document.querySelectorAll('.btn-filtro').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.btn-filtro').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        vistaActual = this.dataset.vista;
+        generarGrafico();
+    });
+});
+
 document.getElementById('btnReiniciarSemana').addEventListener('click', () => {
     if (confirm("¿Reiniciar la semana? Se borrarán los gastos individuales.")) {
         gastosSemanalesList = [];
@@ -474,7 +887,6 @@ document.getElementById('btnBorrarHistorial').addEventListener('click', () => {
     }
 });
 
-// --- EXPORTAR HISTORIAL PDF ---
 document.getElementById('btnExportarHistorialPDF').addEventListener('click', async () => {
     const tabla = document.getElementById('tablaHistorialCompleta');
     if (!tabla || tabla.querySelectorAll('tbody tr').length === 0 || tabla.querySelector('td[colspan]')) {
@@ -496,7 +908,6 @@ document.getElementById('btnExportarHistorialPDF').addEventListener('click', asy
     await generarPDFMultipagina(contenedor, 'Historial', `historial_${Date.now()}.pdf`);
 });
 
-// --- EXPORTAR REPORTE SEMANAL PDF ---
 document.getElementById('btnExportarReportePDF').addEventListener('click', async () => {
     const resumenDiv = document.getElementById('resumenBonito');
     const tablaGastos = document.getElementById('tablaGastos');
@@ -526,7 +937,6 @@ document.getElementById('btnExportarReportePDF').addEventListener('click', async
     await generarPDFMultipagina(contenedor, 'Reporte Semanal', `reporte_semanal_${Date.now()}.pdf`);
 });
 
-// --- EXPORTAR STOCK A EXCEL ---
 document.getElementById('btnExportarStockExcel').addEventListener('click', () => {
     const data = [];
     data.push(['Tela', 'Disponible (mts)', 'Última Salida', 'Días sin uso']);
@@ -547,7 +957,6 @@ document.getElementById('btnExportarStockExcel').addEventListener('click', () =>
     mostrarNotificacion('success', 'Stock exportado a Excel correctamente.');
 });
 
-// --- EXPORTAR HISTORIAL A EXCEL ---
 document.getElementById('btnExportarHistorialExcel').addEventListener('click', () => {
     if (historialMovimientos.length === 0) {
         mostrarNotificacion('error', 'No hay movimientos para exportar.');
@@ -572,7 +981,6 @@ document.getElementById('btnExportarHistorialExcel').addEventListener('click', (
     mostrarNotificacion('success', 'Historial exportado a Excel correctamente.');
 });
 
-// --- EXPORTAR REPORTE SEMANAL A EXCEL ---
 document.getElementById('btnExportarReporteExcel').addEventListener('click', () => {
     if (gastosSemanalesList.length === 0) {
         mostrarNotificacion('error', 'No hay gastos esta semana para exportar.');
@@ -599,7 +1007,6 @@ document.getElementById('btnExportarReporteExcel').addEventListener('click', () 
     mostrarNotificacion('success', 'Reporte semanal exportado a Excel correctamente.');
 });
 
-// --- MENÚ ACORDEÓN ---
 document.querySelectorAll('.menu-titulo').forEach(titulo => {
     titulo.addEventListener('click', function() {
         const categoria = this.dataset.categoria;
@@ -612,7 +1019,6 @@ document.querySelectorAll('.menu-titulo').forEach(titulo => {
     });
 });
 
-// --- NAVEGACIÓN ENTRE PANELES (CON ACTUALIZACIÓN DE GRÁFICO) ---
 const panels = document.querySelectorAll('.panel');
 const optionCards = document.querySelectorAll('.option-card');
 optionCards.forEach(card => {
@@ -622,14 +1028,13 @@ optionCards.forEach(card => {
         document.getElementById(`panel-${target}`).classList.add('active');
         optionCards.forEach(c => c.classList.remove('active'));
         card.classList.add('active');
-        // Si se activa el panel de estadísticas, forzar la actualización del gráfico
         if (target === 'estadisticas') {
             setTimeout(() => generarGrafico(), 200);
         }
     });
 });
+
 document.querySelector('.option-card[data-panel="movimientos"]').classList.add('active');
 document.getElementById('panel-movimientos').classList.add('active');
 
-// Inicializar la interfaz (incluye el gráfico)
 actualizarUI();
