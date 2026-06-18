@@ -1,24 +1,18 @@
-// --- DATOS INICIALES Y LOCALSTORAGE ---
+// ============================================================
+// 1. DATOS INICIALES Y LOCALSTORAGE
+// ============================================================
 const stockInicial = { "Algodón": 150.0, "Lino": 80.0, "Poliéster": 200.0, "Mezclilla (Jeans)": 95.0 };
 let inventario = JSON.parse(localStorage.getItem('textil_inventario')) || stockInicial;
 let historialMovimientos = JSON.parse(localStorage.getItem('textil_historial')) || [];
 let gastosSemanalesList = JSON.parse(localStorage.getItem('textil_gastos_list')) || [];
 
-// --- SISTEMA DE NOTIFICACIONES (TOAST) ---
+// ============================================================
+// 2. SISTEMA DE NOTIFICACIONES (TOAST)
+// ============================================================
 function mostrarNotificacion(tipo, mensaje) {
     const container = document.getElementById('toast-container');
-    const iconos = {
-        success: '✅',
-        error: '❌',
-        warning: '⚠️',
-        info: 'ℹ️'
-    };
-    const clases = {
-        success: 'toast-success',
-        error: 'toast-error',
-        warning: 'toast-warning',
-        info: 'toast-info'
-    };
+    const iconos = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+    const clases = { success: 'toast-success', error: 'toast-error', warning: 'toast-warning', info: 'toast-info' };
     
     const toast = document.createElement('div');
     toast.className = `toast ${clases[tipo]}`;
@@ -27,13 +21,9 @@ function mostrarNotificacion(tipo, mensaje) {
         <span class="toast-message">${mensaje}</span>
         <button class="toast-close">✕</button>
     `;
-    
     container.appendChild(toast);
     
-    const timeout = setTimeout(() => {
-        eliminarToast(toast);
-    }, 5000);
-    
+    const timeout = setTimeout(() => eliminarToast(toast), 5000);
     toast.querySelector('.toast-close').addEventListener('click', () => {
         clearTimeout(timeout);
         eliminarToast(toast);
@@ -42,12 +32,12 @@ function mostrarNotificacion(tipo, mensaje) {
 
 function eliminarToast(toast) {
     toast.style.opacity = '0';
-    setTimeout(() => {
-        if (toast.parentNode) toast.remove();
-    }, 300);
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 300);
 }
 
-// --- FUNCIÓN PARA ASEGURAR TIMESTAMP VÁLIDO ---
+// ============================================================
+// 3. NORMALIZACIÓN DE MOVIMIENTOS
+// ============================================================
 function normalizarMovimientos(lista) {
     return lista.map(mov => {
         if (!mov.timestamp) {
@@ -75,7 +65,9 @@ historialMovimientos = normalizarMovimientos(historialMovimientos);
 gastosSemanalesList = normalizarMovimientos(gastosSemanalesList);
 guardarTodo();
 
-// --- COLORES PASTEL PARA TELAS ---
+// ============================================================
+// 4. FUNCIONES BASE
+// ============================================================
 function getColorPorTela(tela) {
     const base = { "Algodón":"#FFB3BA","Lino":"#C5E99B","Poliéster":"#B5EAD7","Mezclilla (Jeans)":"#FFDAC1" };
     if (base[tela]) return base[tela];
@@ -90,7 +82,6 @@ function guardarTodo() {
     localStorage.setItem('textil_gastos_list', JSON.stringify(gastosSemanalesList));
 }
 
-// --- CÁLCULO DE ROTACIÓN ---
 function calcularRotacion(tela) {
     const salidas = historialMovimientos.filter(m => m.tela === tela && m.tipo === 'salida');
     if (salidas.length === 0) return { lastSaleDate: null, daysSince: null, hasSales: false };
@@ -102,7 +93,9 @@ function calcularRotacion(tela) {
     return { lastSaleDate: lastDate, daysSince: diffDays, hasSales: true };
 }
 
-// --- ACTUALIZAR TABLA DE STOCK ---
+// ============================================================
+// 5. ACTUALIZAR TABLA DE STOCK
+// ============================================================
 function actualizarTablaStock() {
     const tbody = document.getElementById('cuerpoTablaStock');
     tbody.innerHTML = '';
@@ -151,24 +144,6 @@ function actualizarSelect() {
     else if (Object.keys(inventario).length > 0) select.value = Object.keys(inventario)[0];
 }
 
-function actualizarTablaGastos() {
-    const tbody = document.getElementById('cuerpoTablaGastos');
-    tbody.innerHTML = '';
-    if (gastosSemanalesList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#999;">No hay gastos registrados esta semana.</td></tr>';
-        return;
-    }
-    gastosSemanalesList.forEach((g, idx) => {
-        tbody.innerHTML += `
-            <tr>
-                <td>${idx+1}</td><td>${g.tela}</td>
-                <td>${g.cantidad.toFixed(2)} mts</td>
-                <td>${g.hora || '--:--:--'}</td><td>${g.fecha || ''}</td>
-            </tr>
-        `;
-    });
-}
-
 function actualizarResumenBonito() {
     const cont = document.getElementById('resumenBonito');
     const acum = {};
@@ -195,10 +170,74 @@ function actualizarResumenBonito() {
     cont.innerHTML = html;
 }
 
+// ============================================================
+// 6. FILTROS DE FECHAS
+// ============================================================
+function getMovimientosFiltrados() {
+    const filtroTipo = document.getElementById('selectTipoMovimiento').value;
+    const fechaDesde = document.getElementById('fechaDesde').value;
+    const fechaHasta = document.getElementById('fechaHasta').value;
+    const fechaEspecifica = document.getElementById('fechaEspecifica').value;
+    const filtrosFechaActivos = document.getElementById('btnToggleFiltros').textContent.includes('ON');
+
+    let movs = [...historialMovimientos];
+
+    if (filtroTipo !== 'ambos') {
+        movs = movs.filter(m => m.tipo === filtroTipo);
+    }
+
+    function parseFechaLocal(fechaStr) {
+        if (!fechaStr) return null;
+        const partes = fechaStr.split('/');
+        if (partes.length === 3) {
+            return new Date(parseInt(partes[2]), parseInt(partes[1]) - 1, parseInt(partes[0]), 12, 0, 0);
+        }
+        return null;
+    }
+
+    if (filtrosFechaActivos) {
+        if (fechaEspecifica) {
+            const fechaEsp = new Date(fechaEspecifica + 'T12:00:00');
+            movs = movs.filter(m => {
+                const fechaMov = parseFechaLocal(m.fecha);
+                if (!fechaMov) return false;
+                return fechaMov.getFullYear() === fechaEsp.getFullYear() &&
+                       fechaMov.getMonth() === fechaEsp.getMonth() &&
+                       fechaMov.getDate() === fechaEsp.getDate();
+            });
+        } else if (fechaDesde && fechaHasta) {
+            const desde = new Date(fechaDesde + 'T12:00:00');
+            const hasta = new Date(fechaHasta + 'T12:00:00');
+            movs = movs.filter(m => {
+                const fechaMov = parseFechaLocal(m.fecha);
+                if (!fechaMov) return false;
+                return fechaMov >= desde && fechaMov <= hasta;
+            });
+        } else if (fechaDesde) {
+            const desde = new Date(fechaDesde + 'T12:00:00');
+            movs = movs.filter(m => {
+                const fechaMov = parseFechaLocal(m.fecha);
+                if (!fechaMov) return false;
+                return fechaMov >= desde;
+            });
+        } else if (fechaHasta) {
+            const hasta = new Date(fechaHasta + 'T12:00:00');
+            movs = movs.filter(m => {
+                const fechaMov = parseFechaLocal(m.fecha);
+                if (!fechaMov) return false;
+                return fechaMov <= hasta;
+            });
+        }
+    }
+
+    return movs;
+}
+
 function actualizarHistorialCompleto() {
     const tbody = document.getElementById('cuerpoHistorialCompleto');
+    const movs = getMovimientosFiltrados().reverse();
+
     tbody.innerHTML = '';
-    const movs = [...historialMovimientos].reverse();
     if (movs.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center">No hay movimientos registrados.</td></tr>';
         return;
@@ -207,16 +246,99 @@ function actualizarHistorialCompleto() {
         const badge = mov.tipo === 'entrada' ? '<span class="badge-entrada">ENTRADA</span>' : '<span class="badge-salida">SALIDA</span>';
         tbody.innerHTML += `
             <tr>
-                <td>${mov.tela}</td><td>${badge}</td>
+                <td>${mov.tela}</td>
+                <td>${badge}</td>
                 <td>${mov.cantidad.toFixed(2)} mts</td>
-                <td>${mov.fecha}</td><td>${mov.hora || '--:--:--'}</td>
+                <td>${mov.fecha}</td>
+                <td>${mov.hora || '--:--:--'}</td>
             </tr>
         `;
     });
 }
 
-// ====== FUNCIONES PARA PREPARAR DATOS DEL GRÁFICO ======
+function limpiarFiltrosFecha() {
+    document.getElementById('fechaDesde').value = '';
+    document.getElementById('fechaHasta').value = '';
+    document.getElementById('fechaEspecifica').value = '';
+    guardarEstadoFiltros();
+    actualizarHistorialCompleto();
+}
 
+// ============================================================
+// 7. ACORDEÓN DE GASTOS SEMANALES
+// ============================================================
+function renderizarAcordeonGastos() {
+    const contenedor = document.getElementById('bloquesDias');
+    contenedor.innerHTML = '';
+
+    if (gastosSemanalesList.length === 0) {
+        contenedor.innerHTML = '<p style="padding: 15px; text-align:center; color:#999;">No hay gastos registrados esta semana.</p>';
+        return;
+    }
+
+    const grupos = {};
+    gastosSemanalesList.forEach(g => {
+        if (!grupos[g.fecha]) grupos[g.fecha] = [];
+        grupos[g.fecha].push(g);
+    });
+
+    const diasOrdenados = Object.keys(grupos).sort((a, b) => {
+        const fechaA = new Date(a.split('/').reverse().join('-'));
+        const fechaB = new Date(b.split('/').reverse().join('-'));
+        return fechaB - fechaA;
+    });
+
+    const totalSemana = gastosSemanalesList.reduce((sum, g) => sum + g.cantidad, 0);
+    document.getElementById('totalSemana').textContent = `Total: ${totalSemana.toFixed(2)} mts`;
+
+    if (diasOrdenados.length > 0) {
+        const fechas = diasOrdenados.map(d => new Date(d.split('/').reverse().join('-')));
+        const minFecha = new Date(Math.min(...fechas));
+        const maxFecha = new Date(Math.max(...fechas));
+        document.getElementById('semanaInicio').textContent = minFecha.toLocaleDateString();
+        document.getElementById('semanaFin').textContent = maxFecha.toLocaleDateString();
+    }
+
+    diasOrdenados.forEach(fecha => {
+        const gastosDelDia = grupos[fecha];
+        const totalDia = gastosDelDia.reduce((sum, g) => sum + g.cantidad, 0);
+        const fechaObj = new Date(fecha.split('/').reverse().join('-'));
+
+        const diaSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][fechaObj.getDay()];
+        const tieneMovimientos = gastosDelDia.length > 0;
+
+        const bloque = document.createElement('div');
+        bloque.className = 'bloque-dia';
+        bloque.innerHTML = `
+            <div class="bloque-dia-header" data-fecha="${fecha}">
+                <span class="bloque-dia-titulo">${diaSemana} ${fecha} ${tieneMovimientos ? '🟢' : ''}</span>
+                <span class="bloque-dia-total">Total: ${totalDia.toFixed(2)} mts ${tieneMovimientos ? `<span class="badge-movimientos">${gastosDelDia.length} mov.</span>` : ''}</span>
+            </div>
+            <div class="bloque-dia-body mostrar" data-fecha="${fecha}">
+                <table>
+                    <thead>
+                        <tr><th>#</th><th>Tela</th><th>Cantidad (mts)</th><th>Hora</th></tr>
+                    </thead>
+                    <tbody>
+                        ${gastosDelDia.map((g, idx) => `
+                            <tr>
+                                <td>${idx + 1}</td>
+                                <td>${g.tela}</td>
+                                <td>${g.cantidad.toFixed(2)} mts</td>
+                                <td>${g.hora || '--:--:--'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        contenedor.appendChild(bloque);
+    });
+}
+
+// ============================================================
+// 8. FUNCIONES PARA PREPARAR DATOS DEL GRÁFICO
+// ============================================================
 function prepararDatosHora() {
     if (gastosSemanalesList.length === 0) {
         return {
@@ -282,7 +404,8 @@ function prepararDatosDiaSemana() {
     
     gastosSemanalesList.forEach(g => {
         if (g.fecha) {
-            const fecha = new Date(g.fecha.split('/').reverse().join('-'));
+            const partes = g.fecha.split('/');
+            const fecha = new Date(partes[2], partes[1] - 1, partes[0]);
             const dia = fecha.getDay();
             const diaNombre = diasSemana[(dia + 6) % 7];
             if (!acumulado[diaNombre]) acumulado[diaNombre] = {};
@@ -362,7 +485,8 @@ function prepararDatosSemanaMes() {
     
     gastosSemanalesList.forEach(g => {
         if (g.fecha) {
-            const fecha = new Date(g.fecha.split('/').reverse().join('-'));
+            const partes = g.fecha.split('/');
+            const fecha = new Date(partes[2], partes[1] - 1, partes[0]);
             const semana = Math.ceil((fecha.getDate() - fecha.getDay() + 1) / 7);
             const mes = fecha.getMonth() + 1;
             const key = `Sem ${semana} (${mes})`;
@@ -448,7 +572,8 @@ function prepararDatosDiaMes() {
     
     gastosSemanalesList.forEach(g => {
         if (g.fecha) {
-            const fecha = new Date(g.fecha.split('/').reverse().join('-'));
+            const partes = g.fecha.split('/');
+            const fecha = new Date(partes[2], partes[1] - 1, partes[0]);
             const dia = fecha.getDate();
             const key = `Día ${dia}`;
             if (!acumulado[key]) acumulado[key] = {};
@@ -588,8 +713,9 @@ function prepararDatosTop3() {
     };
 }
 
-// ====== GENERADOR DE GRÁFICO CON CAMBIO DE VISTA ======
-
+// ============================================================
+// 9. GENERADOR DE GRÁFICO
+// ============================================================
 let chartInstance = null;
 let vistaActual = 'hora';
 
@@ -635,7 +761,7 @@ function generarGrafico() {
         data.options = data.options || {};
         data.options.plugins = data.options.plugins || {};
         data.options.plugins.afterDraw = (chart) => {
-            const { ctx, data, chartArea: { top, bottom, left, right } } = chart;
+            const { ctx, data } = chart;
             const meta = chart.getDatasetMeta(0);
             meta.data.forEach((bar, index) => {
                 const value = data.datasets[0].data[index];
@@ -655,85 +781,187 @@ function generarGrafico() {
         options: data.options
     });
 
-    console.log(`📊 Gráfico generado con vista: ${vistaActual}`);
+    console.log(`📊 Gráfico generado con vista: ${vistaActual} y ${data.data.labels.length} datos`);
 }
 
-// ====== ACTUALIZAR UI ======
-
+// ============================================================
+// 10. ACTUALIZAR UI
+// ============================================================
 function actualizarUI() {
     actualizarSelect();
     actualizarTablaStock();
-    actualizarTablaGastos();
     actualizarResumenBonito();
     actualizarHistorialCompleto();
+    renderizarAcordeonGastos();
     setTimeout(() => {
         generarGrafico();
     }, 100);
 }
 
-// ====== BÚSQUEDA DE TELAS ======
+// ============================================================
+// 11. FILTROS - GUARDAR/CARGAR ESTADO
+// ============================================================
+function guardarEstadoFiltros() {
+    const estado = {
+        filtrosOn: document.getElementById('btnToggleFiltros').textContent.includes('ON'),
+        tipo: document.getElementById('selectTipoMovimiento').value,
+        fechaDesde: document.getElementById('fechaDesde').value,
+        fechaHasta: document.getElementById('fechaHasta').value,
+        fechaEspecifica: document.getElementById('fechaEspecifica').value
+    };
+    localStorage.setItem('filtrosEstado', JSON.stringify(estado));
+}
 
+function cargarEstadoFiltros() {
+    const guardado = localStorage.getItem('filtrosEstado');
+    if (!guardado) return;
+    try {
+        const estado = JSON.parse(guardado);
+        const btn = document.getElementById('btnToggleFiltros');
+        const filtrosAvanzados = document.getElementById('filtrosAvanzados');
+        if (estado.filtrosOn) {
+            btn.textContent = '🎛️ Filtros: ON';
+            btn.classList.add('active');
+            filtrosAvanzados.style.display = 'block';
+        } else {
+            btn.textContent = '🎛️ Filtros: OFF';
+            btn.classList.remove('active');
+            filtrosAvanzados.style.display = 'none';
+        }
+        document.getElementById('selectTipoMovimiento').value = estado.tipo || 'ambos';
+        document.getElementById('fechaDesde').value = estado.fechaDesde || '';
+        document.getElementById('fechaHasta').value = estado.fechaHasta || '';
+        document.getElementById('fechaEspecifica').value = estado.fechaEspecifica || '';
+    } catch (e) { console.warn('Error al cargar filtros:', e); }
+}
+
+function cargarEstadoAcordeon() {
+    const abierto = localStorage.getItem('acordeonGastosAbierto');
+    if (abierto === 'true') {
+        document.getElementById('bodyGastosSemana').classList.add('mostrar');
+        document.querySelector('.acordeon-flecha').classList.add('abierto');
+    }
+}
+
+// ============================================================
+// 12. EVENTOS DE FILTROS
+// ============================================================
+document.getElementById('btnToggleFiltros').addEventListener('click', function() {
+    const filtrosAvanzados = document.getElementById('filtrosAvanzados');
+    const isOn = this.textContent.includes('ON');
+    
+    if (isOn) {
+        this.textContent = '🎛️ Filtros: OFF';
+        this.classList.remove('active');
+        filtrosAvanzados.style.display = 'none';
+        limpiarFiltrosFecha();
+    } else {
+        this.textContent = '🎛️ Filtros: ON';
+        this.classList.add('active');
+        filtrosAvanzados.style.display = 'block';
+        guardarEstadoFiltros();
+        actualizarHistorialCompleto();
+    }
+});
+
+document.getElementById('selectTipoMovimiento').addEventListener('change', function() {
+    guardarEstadoFiltros();
+    actualizarHistorialCompleto();
+});
+
+document.getElementById('btnAplicarRango').addEventListener('click', function() {
+    const desde = document.getElementById('fechaDesde').value;
+    const hasta = document.getElementById('fechaHasta').value;
+    
+    if (!desde || !hasta) {
+        mostrarNotificacion('error', '⚠️ Debes completar ambos campos (Fecha desde y Fecha hasta) para aplicar el rango.');
+        return;
+    }
+    
+    if (new Date(desde) > new Date(hasta)) {
+        mostrarNotificacion('error', '⚠️ La fecha "desde" no puede ser mayor que la fecha "hasta".');
+        return;
+    }
+    
+    document.getElementById('fechaEspecifica').value = '';
+    guardarEstadoFiltros();
+    actualizarHistorialCompleto();
+    mostrarNotificacion('success', '✅ Rango de fechas aplicado correctamente.');
+});
+
+document.getElementById('fechaEspecifica').addEventListener('change', function() {
+    if (this.value) {
+        document.getElementById('fechaDesde').value = '';
+        document.getElementById('fechaHasta').value = '';
+        guardarEstadoFiltros();
+        actualizarHistorialCompleto();
+        mostrarNotificacion('info', `📆 Mostrando movimientos del ${new Date(this.value).toLocaleDateString()}`);
+    } else {
+        actualizarHistorialCompleto();
+    }
+});
+
+document.getElementById('headerGastosSemana').addEventListener('click', function() {
+    const body = document.getElementById('bodyGastosSemana');
+    const flecha = this.querySelector('.acordeon-flecha');
+    body.classList.toggle('mostrar');
+    flecha.classList.toggle('abierto');
+    localStorage.setItem('acordeonGastosAbierto', body.classList.contains('mostrar'));
+});
+
+// ============================================================
+// 13. BÚSQUEDA DE TELAS
+// ============================================================
 document.getElementById('buscadorTela').addEventListener('input', function() {
     const termino = this.value.toLowerCase().trim();
     const filas = document.querySelectorAll('#cuerpoTablaStock tr');
-    
     filas.forEach(fila => {
         const nombreTela = fila.querySelector('td:first-child')?.textContent?.toLowerCase() || '';
-        if (nombreTela.includes(termino)) {
-            fila.style.display = '';
-        } else {
-            fila.style.display = 'none';
-        }
+        fila.style.display = nombreTela.includes(termino) ? '' : 'none';
     });
 });
 
-// ====== EDITAR NOMBRE DE TELA ======
-
+// ============================================================
+// 14. EDITAR NOMBRE DE TELA
+// ============================================================
 document.getElementById('btnEditarNombreTela').addEventListener('click', function() {
     const telas = Object.keys(inventario);
     if (telas.length === 0) {
         mostrarNotificacion('error', 'No hay telas para editar.');
         return;
     }
-    
     const telaAntigua = prompt('¿Qué tela quieres renombrar? (escribe el nombre exacto)');
     if (!telaAntigua) return;
-    
     if (!inventario[telaAntigua]) {
         mostrarNotificacion('error', `La tela "${telaAntigua}" no existe.`);
         return;
     }
-    
     const nuevoNombreTela = prompt(`Nuevo nombre para "${telaAntigua}":`);
     if (!nuevoNombreTela || nuevoNombreTela.trim() === '') {
         mostrarNotificacion('error', 'El nombre no puede estar vacío.');
         return;
     }
-    
     if (inventario[nuevoNombreTela] && nuevoNombreTela !== telaAntigua) {
         mostrarNotificacion('error', `Ya existe una tela con el nombre "${nuevoNombreTela}".`);
         return;
     }
-    
     const cantidad = inventario[telaAntigua];
     delete inventario[telaAntigua];
     inventario[nuevoNombreTela] = cantidad;
-    
     historialMovimientos.forEach(mov => {
         if (mov.tela === telaAntigua) mov.tela = nuevoNombreTela;
     });
-    
     gastosSemanalesList.forEach(g => {
         if (g.tela === telaAntigua) g.tela = nuevoNombreTela;
     });
-    
     guardarTodo();
     actualizarUI();
     mostrarNotificacion('success', `Tela "${telaAntigua}" renombrada a "${nuevoNombreTela}".`);
 });
 
-// ====== GENERADOR DE PDF MULTIPÁGINA ======
-
+// ============================================================
+// 15. GENERADOR DE PDF MULTIPÁGINA (GENÉRICO)
+// ============================================================
 async function generarPDFMultipagina(elemento, titulo, nombreArchivo) {
     if (!elemento) return;
     const originalDisplay = elemento.style.display;
@@ -808,8 +1036,386 @@ async function generarPDFMultipagina(elemento, titulo, nombreArchivo) {
     }
 }
 
-// ====== EVENTOS ======
+// ============================================================
+// 16. EXPORTAR HISTORIAL PDF
+// ============================================================
+document.getElementById('btnExportarHistorialPDF').addEventListener('click', async () => {
+    const tablaOriginal = document.getElementById('tablaHistorialCompleta');
+    if (!tablaOriginal || tablaOriginal.querySelectorAll('tbody tr').length === 0 || tablaOriginal.querySelector('td[colspan]')) {
+        mostrarNotificacion('error', 'No hay datos en el historial para exportar.');
+        return;
+    }
 
+    const contenedor = document.createElement('div');
+    contenedor.style.backgroundColor = 'white';
+    contenedor.style.padding = '20px';
+    contenedor.style.width = '100%';
+    contenedor.style.fontFamily = 'Arial, sans-serif';
+    
+    const titulo = document.createElement('h2');
+    titulo.innerText = 'Historial de Movimientos';
+    titulo.style.textAlign = 'center';
+    titulo.style.fontSize = '18px';
+    titulo.style.marginBottom = '10px';
+    
+    const fecha = document.createElement('p');
+    fecha.innerText = `Generado: ${new Date().toLocaleString()}`;
+    fecha.style.textAlign = 'center';
+    fecha.style.fontSize = '12px';
+    fecha.style.marginBottom = '20px';
+    
+    contenedor.appendChild(titulo);
+    contenedor.appendChild(fecha);
+
+    const cloneTabla = tablaOriginal.cloneNode(true);
+    cloneTabla.style.width = '100%';
+    cloneTabla.style.borderCollapse = 'collapse';
+    cloneTabla.style.fontSize = '12px';
+    
+    const celdas = cloneTabla.querySelectorAll('th, td');
+    celdas.forEach(celda => {
+        celda.style.border = '1px solid #999';
+        celda.style.padding = '8px';
+        celda.style.textAlign = 'left';
+        celda.style.backgroundColor = 'white';
+    });
+    
+    const headers = cloneTabla.querySelectorAll('th');
+    headers.forEach(th => {
+        th.style.backgroundColor = '#2b2d42';
+        th.style.color = 'white';
+        th.style.fontWeight = 'bold';
+    });
+    
+    const botones = cloneTabla.querySelectorAll('button, .btn-eliminar, .btn-danger, .btn-primary');
+    botones.forEach(btn => btn.remove());
+    
+    contenedor.appendChild(cloneTabla);
+    
+    try {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('portrait', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 10;
+        const contentWidth = pageWidth - margin * 2;
+        
+        document.body.appendChild(contenedor);
+        
+        const canvas = await html2canvas(contenedor, { scale: 1.5, backgroundColor: '#ffffff', logging: false });
+        const imgData = canvas.toDataURL('image/png');
+        const imgHeight = (canvas.height * contentWidth) / canvas.width;
+        let remainingHeight = imgHeight;
+        let yOffset = 0;
+        let page = 1;
+        
+        while (remainingHeight > 0) {
+            if (page > 1) pdf.addPage();
+            const sliceHeight = Math.min(pageHeight - margin * 2, remainingHeight);
+            const canvasSlice = document.createElement('canvas');
+            canvasSlice.width = canvas.width;
+            canvasSlice.height = (sliceHeight / imgHeight) * canvas.height;
+            const ctxSlice = canvasSlice.getContext('2d');
+            ctxSlice.drawImage(canvas, 0, yOffset, canvas.width, canvasSlice.height, 0, 0, canvasSlice.width, canvasSlice.height);
+            const sliceData = canvasSlice.toDataURL('image/png');
+            pdf.addImage(sliceData, 'PNG', margin, margin, contentWidth, sliceHeight);
+            remainingHeight -= sliceHeight;
+            yOffset += canvasSlice.height;
+            page++;
+        }
+        
+        pdf.save(`historial_${Date.now()}.pdf`);
+        mostrarNotificacion('success', 'PDF del historial generado correctamente.');
+        document.body.removeChild(contenedor);
+    } catch (error) {
+        console.error(error);
+        mostrarNotificacion('error', `Error al generar PDF: ${error.message}`);
+    }
+});
+
+// ============================================================
+// 17. EXPORTAR REPORTE SEMANAL PDF (CON BLOQUES POR DÍA)
+// ============================================================
+document.getElementById('btnExportarReportePDF').addEventListener('click', async () => {
+    if (gastosSemanalesList.length === 0) {
+        mostrarNotificacion('error', 'No hay gastos esta semana para generar el reporte.');
+        return;
+    }
+
+    const contenedor = document.createElement('div');
+    contenedor.style.backgroundColor = 'white';
+    contenedor.style.padding = '25px';
+    contenedor.style.width = '100%';
+    contenedor.style.maxWidth = '800px';
+    contenedor.style.margin = '0 auto';
+    contenedor.style.fontFamily = 'Arial, sans-serif';
+    contenedor.style.borderRadius = '8px';
+
+    const titulo = document.createElement('h1');
+    titulo.innerText = '📊 Reporte de gastos semanales';
+    titulo.style.textAlign = 'center';
+    titulo.style.fontSize = '22px';
+    titulo.style.color = '#2b2d42';
+    titulo.style.marginBottom = '5px';
+    contenedor.appendChild(titulo);
+
+    const fechaGen = document.createElement('p');
+    fechaGen.innerText = `Generado: ${new Date().toLocaleString()}`;
+    fechaGen.style.textAlign = 'center';
+    fechaGen.style.fontSize = '12px';
+    fechaGen.style.color = '#666';
+    fechaGen.style.marginBottom = '20px';
+    contenedor.appendChild(fechaGen);
+
+    const resumenDiv = document.getElementById('resumenBonito');
+    if (resumenDiv && resumenDiv.innerHTML !== '') {
+        const cloneResumen = resumenDiv.cloneNode(true);
+        cloneResumen.style.display = 'flex';
+        cloneResumen.style.flexWrap = 'wrap';
+        cloneResumen.style.gap = '10px';
+        cloneResumen.style.justifyContent = 'center';
+        cloneResumen.style.marginBottom = '20px';
+        cloneResumen.style.padding = '10px';
+        cloneResumen.style.backgroundColor = '#f8f9fa';
+        cloneResumen.style.borderRadius = '12px';
+        contenedor.appendChild(cloneResumen);
+    }
+
+    const hr = document.createElement('hr');
+    hr.style.border = 'none';
+    hr.style.borderTop = '2px solid #e9ecef';
+    hr.style.margin = '15px 0';
+    contenedor.appendChild(hr);
+
+    const grupos = {};
+    gastosSemanalesList.forEach(g => {
+        if (!grupos[g.fecha]) grupos[g.fecha] = [];
+        grupos[g.fecha].push(g);
+    });
+
+    const diasOrdenados = Object.keys(grupos).sort((a, b) => {
+        const fechaA = new Date(a.split('/').reverse().join('-'));
+        const fechaB = new Date(b.split('/').reverse().join('-'));
+        return fechaB - fechaA;
+    });
+
+    diasOrdenados.forEach(fecha => {
+        const gastosDelDia = grupos[fecha];
+        const totalDia = gastosDelDia.reduce((sum, g) => sum + g.cantidad, 0);
+        const fechaObj = new Date(fecha.split('/').reverse().join('-'));
+        const diaSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][fechaObj.getDay()];
+
+        const bloque = document.createElement('div');
+        bloque.style.marginBottom = '20px';
+        bloque.style.border = '1px solid #e9ecef';
+        bloque.style.borderRadius = '10px';
+        bloque.style.overflow = 'hidden';
+        bloque.style.backgroundColor = 'white';
+        bloque.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)';
+
+        const header = document.createElement('div');
+        header.style.backgroundColor = '#f1f3f5';
+        header.style.padding = '12px 16px';
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+        header.style.borderBottom = '1px solid #e9ecef';
+        header.innerHTML = `
+            <span style="font-weight: bold; font-size: 14px; color: #2b2d42;">
+                ${diaSemana} ${fecha} 🟢
+            </span>
+            <span style="font-weight: bold; font-size: 14px; color: #1995AD;">
+                Total: ${totalDia.toFixed(2)} mts  (${gastosDelDia.length} mov.)
+            </span>
+        `;
+        bloque.appendChild(header);
+
+        const tabla = document.createElement('table');
+        tabla.style.width = '100%';
+        tabla.style.borderCollapse = 'collapse';
+        tabla.style.fontSize = '12px';
+        tabla.style.backgroundColor = 'white';
+
+        const thead = document.createElement('thead');
+        thead.innerHTML = `
+            <tr style="background-color: #eef2ff; color: #1e2a3a; font-weight: 600;">
+                <th style="padding: 8px 12px; text-align: left; border-bottom: 1px solid #dee2e6;">#</th>
+                <th style="padding: 8px 12px; text-align: left; border-bottom: 1px solid #dee2e6;">Tela</th>
+                <th style="padding: 8px 12px; text-align: left; border-bottom: 1px solid #dee2e6;">Cantidad (mts)</th>
+                <th style="padding: 8px 12px; text-align: left; border-bottom: 1px solid #dee2e6;">Hora</th>
+            </tr>
+        `;
+        tabla.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        gastosDelDia.forEach((g, idx) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="padding: 6px 12px; border-bottom: 1px solid #f1f3f5;">${idx + 1}</td>
+                <td style="padding: 6px 12px; border-bottom: 1px solid #f1f3f5;">${g.tela}</td>
+                <td style="padding: 6px 12px; border-bottom: 1px solid #f1f3f5;">${g.cantidad.toFixed(2)} mts</td>
+                <td style="padding: 6px 12px; border-bottom: 1px solid #f1f3f5;">${g.hora || '--:--:--'}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+        tabla.appendChild(tbody);
+        bloque.appendChild(tabla);
+        contenedor.appendChild(bloque);
+    });
+
+    const graficoCanvas = document.getElementById('graficoGastos');
+    if (graficoCanvas) {
+        try {
+            const img = document.createElement('img');
+            img.src = graficoCanvas.toDataURL('image/png');
+            img.style.width = '100%';
+            img.style.marginTop = '20px';
+            img.style.borderRadius = '8px';
+            img.style.border = '1px solid #e9ecef';
+            contenedor.appendChild(img);
+        } catch (e) {
+            console.warn('No se pudo capturar el gráfico:', e);
+        }
+    }
+
+    try {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('portrait', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 10;
+        const contentWidth = pageWidth - margin * 2;
+
+        document.body.appendChild(contenedor);
+
+        const canvas = await html2canvas(contenedor, {
+            scale: 2,
+            backgroundColor: '#ffffff',
+            logging: false,
+            useCORS: true
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const imgHeight = (canvas.height * contentWidth) / canvas.width;
+        let remainingHeight = imgHeight;
+        let yOffset = 0;
+        let page = 1;
+
+        while (remainingHeight > 0) {
+            if (page > 1) pdf.addPage();
+            const sliceHeight = Math.min(pageHeight - margin * 2, remainingHeight);
+            const canvasSlice = document.createElement('canvas');
+            canvasSlice.width = canvas.width;
+            canvasSlice.height = (sliceHeight / imgHeight) * canvas.height;
+            const ctxSlice = canvasSlice.getContext('2d');
+            ctxSlice.drawImage(canvas, 0, yOffset, canvas.width, canvasSlice.height, 0, 0, canvasSlice.width, canvasSlice.height);
+            const sliceData = canvasSlice.toDataURL('image/png');
+            pdf.addImage(sliceData, 'PNG', margin, margin, contentWidth, sliceHeight);
+            remainingHeight -= sliceHeight;
+            yOffset += canvasSlice.height;
+            page++;
+        }
+
+        pdf.save(`reporte_semanal_${new Date().toISOString().slice(0,10)}.pdf`);
+        mostrarNotificacion('success', '✅ PDF del reporte semanal generado correctamente.');
+        document.body.removeChild(contenedor);
+    } catch (error) {
+        console.error(error);
+        mostrarNotificacion('error', `Error al generar PDF: ${error.message}`);
+    }
+});
+
+// ============================================================
+// 18. EXPORTAR EXCEL
+// ============================================================
+document.getElementById('btnExportarStockExcel').addEventListener('click', () => {
+    const data = [];
+    data.push(['Tela', 'Disponible (mts)', 'Última Salida', 'Días sin uso']);
+    for (const [tela, cant] of Object.entries(inventario)) {
+        const rot = calcularRotacion(tela);
+        let ultimaSalida = 'Nunca';
+        let dias = 'Sin salidas';
+        if (rot.hasSales) {
+            ultimaSalida = rot.lastSaleDate.toLocaleDateString();
+            dias = `${rot.daysSince} día${rot.daysSince !== 1 ? 's' : ''}`;
+        }
+        data.push([tela, cant.toFixed(2), ultimaSalida, dias]);
+    }
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Stock');
+    XLSX.writeFile(wb, `stock_${new Date().toISOString().slice(0,10)}.xlsx`);
+    mostrarNotificacion('success', 'Stock exportado a Excel correctamente.');
+});
+
+document.getElementById('btnExportarHistorialExcel').addEventListener('click', () => {
+    if (historialMovimientos.length === 0) {
+        mostrarNotificacion('error', 'No hay movimientos para exportar.');
+        return;
+    }
+    const data = [];
+    data.push(['Tela', 'Tipo', 'Cantidad (mts)', 'Fecha', 'Hora']);
+    const movs = [...historialMovimientos].reverse();
+    movs.forEach(mov => {
+        data.push([
+            mov.tela,
+            mov.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA',
+            mov.cantidad.toFixed(2),
+            mov.fecha,
+            mov.hora || '--:--:--'
+        ]);
+    });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Historial');
+    XLSX.writeFile(wb, `historial_${new Date().toISOString().slice(0,10)}.xlsx`);
+    mostrarNotificacion('success', 'Historial exportado a Excel correctamente.');
+});
+
+document.getElementById('btnExportarReporteExcel').addEventListener('click', () => {
+    if (gastosSemanalesList.length === 0) {
+        mostrarNotificacion('error', 'No hay gastos esta semana para exportar.');
+        return;
+    }
+    const data = [];
+    data.push(['#', 'Tela', 'Cantidad (mts)', 'Hora', 'Fecha']);
+    gastosSemanalesList.forEach((g, idx) => {
+        data.push([
+            idx+1,
+            g.tela,
+            g.cantidad.toFixed(2),
+            g.hora || '--:--:--',
+            g.fecha || ''
+        ]);
+    });
+    const total = gastosSemanalesList.reduce((sum, g) => sum + g.cantidad, 0);
+    data.push([]);
+    data.push(['TOTAL GASTADO', '', total.toFixed(2), '', '']);
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, 'Reporte Semanal');
+    XLSX.writeFile(wb, `reporte_semanal_${new Date().toISOString().slice(0,10)}.xlsx`);
+    mostrarNotificacion('success', 'Reporte semanal exportado a Excel correctamente.');
+});
+
+// ============================================================
+// 19. MENÚ ACORDEÓN (ADMIN)
+// ============================================================
+document.querySelectorAll('.menu-titulo').forEach(titulo => {
+    titulo.addEventListener('click', function() {
+        const categoria = this.dataset.categoria;
+        const submenu = document.getElementById(`submenu-${categoria}`);
+        const flecha = this.querySelector('.menu-flecha');
+        if (submenu) {
+            submenu.classList.toggle('mostrar');
+            if (flecha) flecha.classList.toggle('abierto');
+        }
+    });
+});
+
+// ============================================================
+// 20. NAVEGACIÓN ENTRE PANELES Y BOTONES DE GRÁFICO
+// ============================================================
 document.querySelectorAll('.btn-filtro').forEach(btn => {
     btn.addEventListener('click', function() {
         document.querySelectorAll('.btn-filtro').forEach(b => b.classList.remove('active'));
@@ -887,138 +1493,131 @@ document.getElementById('btnBorrarHistorial').addEventListener('click', () => {
     }
 });
 
-document.getElementById('btnExportarHistorialPDF').addEventListener('click', async () => {
-    const tabla = document.getElementById('tablaHistorialCompleta');
-    if (!tabla || tabla.querySelectorAll('tbody tr').length === 0 || tabla.querySelector('td[colspan]')) {
-        mostrarNotificacion('error', 'No hay datos en el historial para exportar.');
+// ============================================================
+// 21. SISTEMA DE BIENVENIDA (MODAL Y NOTIFICACIÓN CENTRAL)
+// ============================================================
+
+function obtenerDatosUsuario() {
+    const nombre = localStorage.getItem('usuario_nombre');
+    const cargo = localStorage.getItem('usuario_cargo');
+    return { nombre, cargo };
+}
+
+function guardarDatosUsuario(nombre, cargo) {
+    localStorage.setItem('usuario_nombre', nombre.trim());
+    if (cargo && cargo.trim() !== '') {
+        localStorage.setItem('usuario_cargo', cargo.trim());
+    } else {
+        localStorage.removeItem('usuario_cargo');
+    }
+}
+
+function mostrarModalBienvenida() {
+    const modal = document.getElementById('modalBienvenida');
+    modal.style.display = 'flex';
+    document.getElementById('inputNombre').focus();
+}
+
+function cerrarModalBienvenida() {
+    document.getElementById('modalBienvenida').style.display = 'none';
+}
+
+function mostrarNotificacionBienvenida(nombre, cargo) {
+    const notif = document.getElementById('notificacionBienvenida');
+    const mensaje = document.getElementById('mensajeBienvenida');
+    const cargoElem = document.getElementById('mensajeCargo');
+    const content = notif.querySelector('.notificacion-content');
+    
+    const hora = new Date().getHours();
+    let saludo = 'Buen día';
+    if (hora >= 12 && hora < 19) saludo = 'Buenas tardes';
+    else if (hora >= 19) saludo = 'Buenas noches';
+    
+    let mensajeCompleto = `${saludo} y bienvenido/a`;
+    let cargoMostrar = '';
+    
+    if (cargo && cargo.trim() !== '') {
+        mensajeCompleto += ` ${cargo}`;
+        cargoMostrar = cargo;
+    }
+    
+    mensajeCompleto += ` ${nombre}`;
+    
+    mensaje.textContent = mensajeCompleto;
+    cargoElem.textContent = cargoMostrar;
+    notif.style.display = 'flex';
+    
+    // Limpiar clases previas
+    content.classList.remove('ocultar');
+    notif.style.opacity = '1';
+    
+    // Desaparecer progresivamente después de 2.05 segundos
+    setTimeout(() => {
+        content.classList.add('ocultar');
+        notif.style.opacity = '0';
+        
+        // Ocultar completamente después de la transición
+        setTimeout(() => {
+            cerrarNotificacionBienvenida();
+        }, 800);
+    }, 2050);
+}
+
+function cerrarNotificacionBienvenida() {
+    const notif = document.getElementById('notificacionBienvenida');
+    const content = notif.querySelector('.notificacion-content');
+    content.classList.remove('ocultar');
+    notif.style.display = 'none';
+    notif.style.opacity = '1';
+}
+
+// --- Eventos del modal ---
+document.getElementById('btnGuardarUsuario').addEventListener('click', function() {
+    const nombre = document.getElementById('inputNombre').value.trim();
+    const cargo = document.getElementById('inputCargo').value.trim();
+    
+    if (!nombre) {
+        mostrarNotificacion('error', '⚠️ Por favor, ingresa tu nombre.');
+        document.getElementById('inputNombre').focus();
         return;
     }
-    const contenedor = document.createElement('div');
-    contenedor.style.backgroundColor = 'white';
-    const titulo = document.createElement('h2');
-    titulo.innerText = 'Historial de Movimientos';
-    titulo.style.textAlign = 'center';
-    const fecha = document.createElement('p');
-    fecha.innerText = `Generado: ${new Date().toLocaleString()}`;
-    fecha.style.textAlign = 'center';
-    contenedor.appendChild(titulo);
-    contenedor.appendChild(fecha);
-    const cloneTabla = tabla.cloneNode(true);
-    contenedor.appendChild(cloneTabla);
-    await generarPDFMultipagina(contenedor, 'Historial', `historial_${Date.now()}.pdf`);
+    
+    guardarDatosUsuario(nombre, cargo);
+    cerrarModalBienvenida();
+    mostrarNotificacion('success', `✅ ¡Bienvenido/a ${nombre}!`);
+    setTimeout(() => {
+        mostrarNotificacionBienvenida(nombre, cargo);
+    }, 300);
 });
 
-document.getElementById('btnExportarReportePDF').addEventListener('click', async () => {
-    const resumenDiv = document.getElementById('resumenBonito');
-    const tablaGastos = document.getElementById('tablaGastos');
-    const graficoCanvas = document.getElementById('graficoGastos');
-    if (!tablaGastos || tablaGastos.querySelectorAll('tbody tr').length === 0) {
-        mostrarNotificacion('error', 'No hay gastos esta semana para generar el reporte.');
-        return;
+// --- Verificar usuario al cargar la página ---
+function verificarUsuario() {
+    const { nombre, cargo } = obtenerDatosUsuario();
+    
+    if (!nombre) {
+        setTimeout(() => {
+            mostrarModalBienvenida();
+        }, 300);
+    } else {
+        setTimeout(() => {
+            mostrarNotificacionBienvenida(nombre, cargo);
+        }, 500);
     }
-    const contenedor = document.createElement('div');
-    const titulo = document.createElement('h2');
-    titulo.innerText = 'Reporte de gastos semanales';
-    titulo.style.textAlign = 'center';
-    const fecha = document.createElement('p');
-    fecha.innerText = `Generado: ${new Date().toLocaleString()}`;
-    fecha.style.textAlign = 'center';
-    contenedor.appendChild(titulo);
-    contenedor.appendChild(fecha);
-    const cloneResumen = resumenDiv.cloneNode(true);
-    const cloneTabla = tablaGastos.cloneNode(true);
-    contenedor.appendChild(cloneResumen);
-    contenedor.appendChild(cloneTabla);
-    const img = document.createElement('img');
-    img.src = graficoCanvas.toDataURL();
-    img.style.width = '100%';
-    img.style.marginTop = '20px';
-    contenedor.appendChild(img);
-    await generarPDFMultipagina(contenedor, 'Reporte Semanal', `reporte_semanal_${Date.now()}.pdf`);
+}
+
+// ============================================================
+// 22. EDITAR NOMBRE DE BIENVENIDA
+// ============================================================
+document.getElementById('btnEditarBienvenida').addEventListener('click', function() {
+    const { nombre, cargo } = obtenerDatosUsuario();
+    document.getElementById('inputNombre').value = nombre || '';
+    document.getElementById('inputCargo').value = cargo || '';
+    mostrarModalBienvenida();
 });
 
-document.getElementById('btnExportarStockExcel').addEventListener('click', () => {
-    const data = [];
-    data.push(['Tela', 'Disponible (mts)', 'Última Salida', 'Días sin uso']);
-    for (const [tela, cant] of Object.entries(inventario)) {
-        const rot = calcularRotacion(tela);
-        let ultimaSalida = 'Nunca';
-        let dias = 'Sin salidas';
-        if (rot.hasSales) {
-            ultimaSalida = rot.lastSaleDate.toLocaleDateString();
-            dias = `${rot.daysSince} día${rot.daysSince !== 1 ? 's' : ''}`;
-        }
-        data.push([tela, cant.toFixed(2), ultimaSalida, dias]);
-    }
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, 'Stock');
-    XLSX.writeFile(wb, `stock_${new Date().toISOString().slice(0,10)}.xlsx`);
-    mostrarNotificacion('success', 'Stock exportado a Excel correctamente.');
-});
-
-document.getElementById('btnExportarHistorialExcel').addEventListener('click', () => {
-    if (historialMovimientos.length === 0) {
-        mostrarNotificacion('error', 'No hay movimientos para exportar.');
-        return;
-    }
-    const data = [];
-    data.push(['Tela', 'Tipo', 'Cantidad (mts)', 'Fecha', 'Hora']);
-    const movs = [...historialMovimientos].reverse();
-    movs.forEach(mov => {
-        data.push([
-            mov.tela,
-            mov.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA',
-            mov.cantidad.toFixed(2),
-            mov.fecha,
-            mov.hora || '--:--:--'
-        ]);
-    });
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, 'Historial');
-    XLSX.writeFile(wb, `historial_${new Date().toISOString().slice(0,10)}.xlsx`);
-    mostrarNotificacion('success', 'Historial exportado a Excel correctamente.');
-});
-
-document.getElementById('btnExportarReporteExcel').addEventListener('click', () => {
-    if (gastosSemanalesList.length === 0) {
-        mostrarNotificacion('error', 'No hay gastos esta semana para exportar.');
-        return;
-    }
-    const data = [];
-    data.push(['#', 'Tela', 'Cantidad (mts)', 'Hora', 'Fecha']);
-    gastosSemanalesList.forEach((g, idx) => {
-        data.push([
-            idx+1,
-            g.tela,
-            g.cantidad.toFixed(2),
-            g.hora || '--:--:--',
-            g.fecha || ''
-        ]);
-    });
-    const total = gastosSemanalesList.reduce((sum, g) => sum + g.cantidad, 0);
-    data.push([]);
-    data.push(['TOTAL GASTADO', '', total.toFixed(2), '', '']);
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    XLSX.utils.book_append_sheet(wb, ws, 'Reporte Semanal');
-    XLSX.writeFile(wb, `reporte_semanal_${new Date().toISOString().slice(0,10)}.xlsx`);
-    mostrarNotificacion('success', 'Reporte semanal exportado a Excel correctamente.');
-});
-
-document.querySelectorAll('.menu-titulo').forEach(titulo => {
-    titulo.addEventListener('click', function() {
-        const categoria = this.dataset.categoria;
-        const submenu = document.getElementById(`submenu-${categoria}`);
-        const flecha = this.querySelector('.menu-flecha');
-        if (submenu) {
-            submenu.classList.toggle('mostrar');
-            if (flecha) flecha.classList.toggle('abierto');
-        }
-    });
-});
-
+// ============================================================
+// 23. INICIALIZACIÓN
+// ============================================================
 const panels = document.querySelectorAll('.panel');
 const optionCards = document.querySelectorAll('.option-card');
 optionCards.forEach(card => {
@@ -1037,4 +1636,7 @@ optionCards.forEach(card => {
 document.querySelector('.option-card[data-panel="movimientos"]').classList.add('active');
 document.getElementById('panel-movimientos').classList.add('active');
 
+cargarEstadoFiltros();
+cargarEstadoAcordeon();
+verificarUsuario();
 actualizarUI();

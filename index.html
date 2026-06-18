@@ -34,7 +34,7 @@
     <div id="panel-estadisticas" class="panel">
         <h2>📊 Estadísticas de consumo semanal</h2>
         <div class="acciones">
-            <button id="btnReiniciarSemana" class="btn-danger">🔄 Reiniciar Semana</button>
+            <button id="btnReiniciarSemana" class="btn-danger">🔄 Reiniciar Reporte</button>
         </div>
 
         <div class="filtros-grafico">
@@ -46,19 +46,62 @@
         </div>
 
         <h3>📋 Lista de gastos de la semana (salidas)</h3>
-        <table class="tabla-gastos" id="tablaGastos">
-            <thead><tr><th>#</th><th>Tela</th><th>Cantidad (mts)</th><th>Hora</th><th>Fecha</th></tr></thead>
-            <tbody id="cuerpoTablaGastos"></tbody>
-        </table>
+        <div id="acordeonGastosSemana" class="acordeon-container">
+            <div class="acordeon-item">
+                <div class="acordeon-header" id="headerGastosSemana">
+                    <span class="acordeon-titulo">📅 Semana del <span id="semanaInicio"></span> al <span id="semanaFin"></span></span>
+                    <span class="acordeon-total" id="totalSemana">Total: 0.00 mts</span>
+                    <span class="acordeon-flecha">▶</span>
+                </div>
+                <div class="acordeon-body" id="bodyGastosSemana">
+                    <div id="bloquesDias"></div>
+                </div>
+            </div>
+        </div>
+
         <div id="resumenBonito" class="resumen-container"></div>
         <div class="grafico-container">
             <canvas id="graficoGastos" width="800" height="400" style="max-height: 400px; width:100%"></canvas>
         </div>
+
         <h3>📜 Historial completo de movimientos (entradas + salidas)</h3>
-        <table class="tabla-historial" id="tablaHistorialCompleta">
-            <thead><tr><th>Tela</th><th>Tipo</th><th>Cantidad (mts)</th><th>Fecha</th><th>Hora</th></tr></thead>
-            <tbody id="cuerpoHistorialCompleto"></tbody>
-        </table>
+
+        <!-- Panel de filtros -->
+        <div class="panel-filtros">
+            <div class="filtros-header">
+                <button id="btnToggleFiltros" class="btn-filtro-toggle">🎛️ Filtros: OFF</button>
+                <select id="selectTipoMovimiento" class="select-tipo">
+                    <option value="ambos">📋 Ambos</option>
+                    <option value="entrada">📥 Entradas</option>
+                    <option value="salida">📤 Salidas</option>
+                </select>
+            </div>
+
+            <div id="filtrosAvanzados" style="display: none;">
+                <div class="filtros-row">
+                    <div class="filtro-group">
+                        <label>📅 Rango de fechas</label>
+                        <div class="filtro-fechas">
+                            <input type="date" id="fechaDesde" />
+                            <span>—</span>
+                            <input type="date" id="fechaHasta" />
+                            <button id="btnAplicarRango" class="btn-filtro-aplicar">🔍 Aplicar</button>
+                        </div>
+                    </div>
+                    <div class="filtro-group">
+                        <label>📆 Fecha específica</label>
+                        <input type="date" id="fechaEspecifica" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tabla-wrapper">
+            <table class="tabla-historial" id="tablaHistorialCompleta">
+                <thead><tr><th>Tela</th><th>Tipo</th><th>Cantidad (mts)</th><th>Fecha</th><th>Hora</th></tr></thead>
+                <tbody id="cuerpoHistorialCompleto"></tbody>
+            </table>
+        </div>
     </div>
 
     <div id="panel-movimientos" class="panel">
@@ -161,6 +204,7 @@
                         <div class="menu-opciones" id="submenu-editar">
                             <button id="btnBorrarHistorial" class="btn-danger">🗑️ Borrar historial</button>
                             <button id="btnEditarNombreTela" class="btn-primary">✏️ Editar nombre</button>
+                            <button id="btnEditarBienvenida" class="btn-accent">👤 Editar nombre de bienvenida</button>
                         </div>
                     </div>
                 </div>
@@ -169,6 +213,33 @@
     </div>
 </div>
 <div id="toast-container"></div>
+
+<!-- Modal de bienvenida -->
+<div id="modalBienvenida" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <h2>👋 ¡Bienvenido al Sistema!</h2>
+        <p>Ingresa tu nombre para personalizar tu experiencia. El cargo es opcional.</p>
+        <div class="form-group">
+            <label for="inputNombre">Tu nombre <span style="color:red;">*</span></label>
+            <input type="text" id="inputNombre" placeholder="Ej. Gabriel" />
+        </div>
+        <div class="form-group">
+            <label for="inputCargo">Tu cargo <span style="color:#999;font-weight:normal;">(opcional)</span></label>
+            <input type="text" id="inputCargo" placeholder="Ej. Gerente, Almacenista, Señorita..." />
+        </div>
+        <button id="btnGuardarUsuario" class="btn-primary">✅ Ingresar</button>
+    </div>
+</div>
+
+<!-- Notificación de bienvenida (centro, sin botón) -->
+<div id="notificacionBienvenida" class="notificacion-bienvenida" style="display: none;">
+    <div class="notificacion-content">
+        <span class="notificacion-icon">👋</span>
+        <h2 id="mensajeBienvenida">Buen día y bienvenido/a</h2>
+        <p id="mensajeCargo"></p>
+    </div>
+</div>
+
 <script src="script.js"></script>
 </body>
 </html>
