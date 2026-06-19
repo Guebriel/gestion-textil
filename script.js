@@ -1326,9 +1326,15 @@ document.getElementById('btnExportarReportePDF').addEventListener('click', async
 });
 
 // ============================================================
-// 18. EXPORTAR EXCEL
+// 18. EXPORTAR EXCEL (CON VALIDACIÓN DE CONEXIÓN)
 // ============================================================
 document.getElementById('btnExportarStockExcel').addEventListener('click', () => {
+    // VALIDACIÓN DE CONEXIÓN
+    if (!navigator.onLine) {
+        mostrarNotificacion('warning', '⚠️ Lo lamento, pero requiere de conexión a internet para utilizar esta función.');
+        return;
+    }
+    
     const data = [];
     data.push(['Tela', 'Disponible (mts)', 'Última Salida', 'Días sin uso']);
     for (const [tela, cant] of Object.entries(inventario)) {
@@ -1349,6 +1355,12 @@ document.getElementById('btnExportarStockExcel').addEventListener('click', () =>
 });
 
 document.getElementById('btnExportarHistorialExcel').addEventListener('click', () => {
+    // VALIDACIÓN DE CONEXIÓN
+    if (!navigator.onLine) {
+        mostrarNotificacion('warning', '⚠️ Lo lamento, pero requiere de conexión a internet para utilizar esta función.');
+        return;
+    }
+    
     if (historialMovimientos.length === 0) {
         mostrarNotificacion('error', 'No hay movimientos para exportar.');
         return;
@@ -1373,6 +1385,12 @@ document.getElementById('btnExportarHistorialExcel').addEventListener('click', (
 });
 
 document.getElementById('btnExportarReporteExcel').addEventListener('click', () => {
+    // VALIDACIÓN DE CONEXIÓN
+    if (!navigator.onLine) {
+        mostrarNotificacion('warning', '⚠️ Lo lamento, pero requiere de conexión a internet para utilizar esta función.');
+        return;
+    }
+    
     if (gastosSemanalesList.length === 0) {
         mostrarNotificacion('error', 'No hay gastos esta semana para exportar.');
         return;
@@ -1547,16 +1565,13 @@ function mostrarNotificacionBienvenida(nombre, cargo) {
     cargoElem.textContent = cargoMostrar;
     notif.style.display = 'flex';
     
-    // Limpiar clases previas
     content.classList.remove('ocultar');
     notif.style.opacity = '1';
     
-    // Desaparecer progresivamente después de 2.05 segundos
     setTimeout(() => {
         content.classList.add('ocultar');
         notif.style.opacity = '0';
         
-        // Ocultar completamente después de la transición
         setTimeout(() => {
             cerrarNotificacionBienvenida();
         }, 800);
@@ -1571,7 +1586,6 @@ function cerrarNotificacionBienvenida() {
     notif.style.opacity = '1';
 }
 
-// --- Eventos del modal ---
 document.getElementById('btnGuardarUsuario').addEventListener('click', function() {
     const nombre = document.getElementById('inputNombre').value.trim();
     const cargo = document.getElementById('inputCargo').value.trim();
@@ -1590,7 +1604,6 @@ document.getElementById('btnGuardarUsuario').addEventListener('click', function(
     }, 300);
 });
 
-// --- Verificar usuario al cargar la página ---
 function verificarUsuario() {
     const { nombre, cargo } = obtenerDatosUsuario();
     
@@ -1605,9 +1618,6 @@ function verificarUsuario() {
     }
 }
 
-// ============================================================
-// 22. EDITAR NOMBRE DE BIENVENIDA
-// ============================================================
 document.getElementById('btnEditarBienvenida').addEventListener('click', function() {
     const { nombre, cargo } = obtenerDatosUsuario();
     document.getElementById('inputNombre').value = nombre || '';
@@ -1616,7 +1626,7 @@ document.getElementById('btnEditarBienvenida').addEventListener('click', functio
 });
 
 // ============================================================
-// 23. INICIALIZACIÓN
+// 22. INICIALIZACIÓN
 // ============================================================
 const panels = document.querySelectorAll('.panel');
 const optionCards = document.querySelectorAll('.option-card');
